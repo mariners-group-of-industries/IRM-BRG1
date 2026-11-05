@@ -18,6 +18,12 @@ const FILTERS = [
   { value: 'company.', label: 'Company changes' },
   { value: 'tenant.', label: 'Tenant changes' },
   { value: 'user.', label: 'User changes' },
+  { value: 'register_import.', label: 'Register imports' },
+  { value: 'shareholder.', label: 'Shareholder data views' },
+  { value: 'corporate_rep.', label: 'Corporate representatives' },
+  { value: 'proxy.', label: 'Proxies' },
+  { value: 'participant.', label: 'Shareholder sign-ins' },
+  { value: 'auth.mfa', label: 'Two-step verification' },
 ];
 
 export default function AuditPage() {

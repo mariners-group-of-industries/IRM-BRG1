@@ -1,13 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { ChevronLeft, Pencil, UserPlus, Users } from 'lucide-react';
+import { Pencil, UserPlus, Users } from 'lucide-react';
 import {
   COMPANY_TYPE_LABELS,
   COMPANY_TYPES,
@@ -43,66 +41,30 @@ import {
   TR,
   Textarea,
 } from '@irm/ui';
-import { PageHeader } from '@/components/shell/app-shell';
-import { CompanyStatusBadge, UserStatusBadge } from '@/components/status';
+import { UserStatusBadge } from '@/components/status';
+import { useCompany } from './company-context';
 import { api, ApiError } from '@/lib/api';
 import { companyTypeLabel, formatDate, formatDateTime } from '@/lib/format';
 import { useSession } from '@/lib/session';
 
-export default function CompanyPage() {
-  const { id } = useParams<{ id: string }>();
+export default function CompanyOverviewPage() {
+  const c = useCompany();
   const { can } = useSession();
   const [editing, setEditing] = React.useState(false);
-  const q = useQuery({ queryKey: ['companies', 'detail', id], queryFn: () => api.get<CompanySummary>(`/companies/${id}`) });
-
-  if (q.isError) {
-    return (
-      <>
-        <BackLink />
-        <Alert tone="danger" title={q.error instanceof ApiError && q.error.status === 404 ? 'Company not found' : 'Could not load company'}>
-          {q.error instanceof ApiError && q.error.status === 404
-            ? 'It may not exist, or you may not have access to it.'
-            : q.error.message}
-        </Alert>
-      </>
-    );
-  }
-  if (q.isPending) {
-    return (
-      <>
-        <BackLink />
-        <Skeleton className="h-8 w-80" />
-        <Skeleton className="mt-8 h-48" />
-      </>
-    );
-  }
-
-  const c = q.data;
-  const scope = { tenantId: c.tenantId, companyId: c.id };
   return (
     <>
-      <BackLink />
-      <PageHeader
-        title={c.legalName}
-        eyebrow={
-          <span className="flex flex-wrap items-center gap-2">
-            {c.tenantName}
-            <span aria-hidden>·</span>
-            <CompanyStatusBadge status={c.status} />
-          </span>
-        }
-        actions={
-          can('company.update', scope) && (
-            <Button variant="secondary" onClick={() => setEditing(true)}>
-              <Pencil aria-hidden /> Edit profile
-            </Button>
-          )
-        }
-      />
-
       <div className="grid gap-6 xl:grid-cols-3">
         <Panel>
-          <PanelHeader title="Profile" />
+          <PanelHeader
+            title="Profile"
+            actions={
+              can('company.update', c.scope) && (
+                <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+                  <Pencil aria-hidden /> Edit
+                </Button>
+              )
+            }
+          />
           <dl className="divide-y divide-line text-sm">
             <Row label="Short name" value={c.shortName} />
             <Row label="Type" value={companyTypeLabel(c.companyType)} />
@@ -126,14 +88,6 @@ export default function CompanyPage() {
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function BackLink() {
-  return (
-    <Link href="/companies" className="mb-4 inline-flex items-center gap-1 rounded text-sm text-ink-3 hover:text-ink focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none">
-      <ChevronLeft className="size-4" aria-hidden /> Companies
-    </Link>
   );
 }
 
@@ -274,10 +228,8 @@ function AddMemberForm({ company, roles, onDone }: { company: CompanySummary; ro
   const selectedRole = useWatch({ control: form.control, name: 'roleKey' });
 
   const add = useMutation({
-    mutationFn: async (v: AddMemberValues) => {
-      const created = await api.post<{ id: string }>('/users', { fullName: v.fullName, email: v.email, password: v.password });
-      await api.post('/assignments', { userId: created.id, roleKey: v.roleKey, scope: 'COMPANY', companyId: company.id });
-    },
+    // One request: the account and its role are created together or not at all.
+    mutationFn: (v: AddMemberValues) => api.post(`/companies/${company.id}/members`, v),
     onSuccess: () => {
       toast.success('Member added');
       qc.invalidateQueries({ queryKey: ['users'] });

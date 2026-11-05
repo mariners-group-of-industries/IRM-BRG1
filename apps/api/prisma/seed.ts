@@ -11,6 +11,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import argon2 from 'argon2';
 import { ALL_PERMISSIONS, PERMISSION_DESCRIPTIONS, ROLE_DEFINITIONS } from '@irm/shared';
 import { PrismaClient, type RoleScope } from '../src/generated/prisma/client.js';
+import { seedDemoRegister } from './seed-register.js';
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 
@@ -118,7 +119,10 @@ async function seedDemo(): Promise<void> {
 
 async function main(): Promise<void> {
   await syncCatalogue();
-  if (process.env.NODE_ENV !== 'production') await seedDemo();
+  if (process.env.NODE_ENV !== 'production') {
+    await seedDemo();
+    await seedDemoRegister(prisma);
+  }
 }
 
 main()

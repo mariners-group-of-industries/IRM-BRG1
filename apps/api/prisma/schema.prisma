@@ -90,25 +90,42 @@ enum UserStatus {
 }
 
 /// A login identity. Users are global; what they can see is defined only by role assignments.
+enum UserKind {
+  /// Company and platform staff. Sign in with email, password and optional TOTP.
+  STAFF
+  /// Shareholders, corporate representatives and proxies. Sign in with a one-time code only.
+  PARTICIPANT
+}
+
 model User {
-  id               String     @id @default(uuid(7)) @db.Uuid
-  email            String     @unique @db.VarChar(254)
-  fullName         String     @map("full_name") @db.VarChar(160)
+  id                String     @id @default(uuid(7)) @db.Uuid
+  kind              UserKind   @default(STAFF)
+  /// Required for staff. Individual shareholders may have only a phone number.
+  email             String?    @unique @db.VarChar(254)
+  phone             String?    @db.VarChar(20)
+  fullName          String     @map("full_name") @db.VarChar(160)
   /// argon2id hash. Null for participant identities that log in by OTP only.
-  passwordHash     String?    @map("password_hash")
-  status           UserStatus @default(ACTIVE)
-  failedLoginCount Int        @default(0) @map("failed_login_count")
-  lockedUntil      DateTime?  @map("locked_until") @db.Timestamptz(3)
-  lastLoginAt      DateTime?  @map("last_login_at") @db.Timestamptz(3)
-  mfaEnabled       Boolean    @default(false) @map("mfa_enabled")
-  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  passwordHash      String?    @map("password_hash")
+  status            UserStatus @default(ACTIVE)
+  failedLoginCount  Int        @default(0) @map("failed_login_count")
+  lockedUntil       DateTime?  @map("locked_until") @db.Timestamptz(3)
+  lastLoginAt       DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  mfaEnabled        Boolean    @default(false) @map("mfa_enabled")
+  /// AES-256-GCM encrypted TOTP secret (iv.tag.ciphertext, base64url). Never returned by the API.
+  mfaSecretEnc      String?    @map("mfa_secret_enc")
+  /// Last accepted TOTP time step, to block code replay.
+  mfaLastStep       Int?       @map("mfa_last_step")
+  /// SHA-256 hashes of unused recovery codes.
+  mfaRecoveryHashes String[]   @default([]) @map("mfa_recovery_hashes")
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   assignments        UserRoleAssignment[] @relation("AssignedUser")
   grantedAssignments UserRoleAssignment[] @relation("GrantedBy")
   revokedAssignments UserRoleAssignment[] @relation("RevokedBy")
   sessions           Session[]
   auditLogs          AuditLog[]
+  participantLinks   ParticipantLink[]
 
   @@map("users")
 }
@@ -239,4 +256,364 @@ model AuditLog {
   @@index([actorUserId, occurredAt(sort: Desc)])
   @@index([action])
   @@map("audit_logs")
+}
+
+// ═══ Phase B: shareholder system ═══════════════════════════════════════
+// Every table below carries tenant_id and company_id, has a composite FK to
+// companies(id, tenant_id), and is protected by PostgreSQL row-level security
+// (see the phase_b migration and docs/DATABASE.md).
+
+model ShareClass {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  code          String   @db.VarChar(12)
+  name          String   @db.VarChar(80)
+  votesPerShare Int      @default(1) @map("votes_per_share")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  holdings Shareholding[]
+
+  @@unique([companyId, code])
+  @@map("share_classes")
+}
+
+enum HolderType {
+  INDIVIDUAL
+  CORPORATE
+}
+
+enum ShareholderStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Shareholder {
+  id        String            @id @default(uuid(7)) @db.Uuid
+  tenantId  String            @map("tenant_id") @db.Uuid
+  companyId String            @map("company_id") @db.Uuid
+  type      HolderType
+  name      String            @db.VarChar(200)
+  nameBn    String?           @map("name_bn") @db.VarChar(200)
+  status    ShareholderStatus @default(ACTIVE)
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  identities       ShareholderIdentity[]
+  contacts         ShareholderContact[]
+  corporateReps    CorporateRepresentative[]
+  proxiesGranted   ProxyAuthorization[]
+  participantLinks ParticipantLink[]
+
+  @@index([companyId, name])
+  @@map("shareholders")
+}
+
+enum IdentityKind {
+  BO
+  FOLIO
+}
+
+/// A BO account or folio. One shareholder may hold several, which is common for corporate holders.
+model ShareholderIdentity {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  tenantId      String       @map("tenant_id") @db.Uuid
+  companyId     String       @map("company_id") @db.Uuid
+  shareholderId String       @map("shareholder_id") @db.Uuid
+  kind          IdentityKind
+  value         String       @db.VarChar(20)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  shareholder Shareholder    @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
+  holdings    Shareholding[]
+
+  @@unique([companyId, kind, value])
+  @@index([shareholderId])
+  @@map("shareholder_identities")
+}
+
+enum ContactKind {
+  PHONE
+  EMAIL
+}
+
+enum ContactSource {
+  REGISTER
+  MANUAL
+}
+
+/// Contacts used for one-time sign-in codes. Register contacts are the official record.
+model ShareholderContact {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  companyId     String        @map("company_id") @db.Uuid
+  shareholderId String        @map("shareholder_id") @db.Uuid
+  kind          ContactKind
+  value         String        @db.VarChar(254)
+  source        ContactSource
+  verifiedAt    DateTime?     @map("verified_at") @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  retiredAt     DateTime?     @map("retired_at") @db.Timestamptz(3)
+
+  shareholder Shareholder @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
+
+  @@index([shareholderId])
+  @@map("shareholder_contacts")
+}
+
+/// Versioned holding. A change closes the current row (valid_to) and opens a new one.
+model Shareholding {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  identityId   String    @map("identity_id") @db.Uuid
+  shareClassId String    @map("share_class_id") @db.Uuid
+  quantity     BigInt
+  asOfDate     DateTime  @map("as_of_date") @db.Date
+  validFrom    DateTime  @default(now()) @map("valid_from") @db.Timestamptz(3)
+  validTo      DateTime? @map("valid_to") @db.Timestamptz(3)
+  importId     String?   @map("import_id") @db.Uuid
+
+  identity   ShareholderIdentity @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  shareClass ShareClass          @relation(fields: [shareClassId], references: [id], onDelete: Restrict)
+  import     RegisterImport?     @relation(fields: [importId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, validTo])
+  @@index([identityId])
+  @@map("shareholdings")
+}
+
+enum ImportStatus {
+  UPLOADED
+  VALIDATED
+  COMMITTED
+  CANCELLED
+  FAILED
+}
+
+enum ImportMode {
+  FULL
+  DELTA
+}
+
+model RegisterImport {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  companyId      String       @map("company_id") @db.Uuid
+  fileId         String       @map("file_id") @db.Uuid
+  status         ImportStatus @default(UPLOADED)
+  mode           ImportMode?
+  asOfDate       DateTime?    @map("as_of_date") @db.Date
+  headers        String[]
+  mapping        Json?
+  totalRows      Int          @default(0) @map("total_rows")
+  validRows      Int          @default(0) @map("valid_rows")
+  errorRows      Int          @default(0) @map("error_rows")
+  /// Counts by action after validation: new, changed, unchanged, closed.
+  summary        Json?
+  createdById    String       @map("created_by_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  validatedAt    DateTime?    @map("validated_at") @db.Timestamptz(3)
+  committedById  String?      @map("committed_by_id") @db.Uuid
+  committedAt    DateTime?    @map("committed_at") @db.Timestamptz(3)
+  failureMessage String?      @map("failure_message") @db.VarChar(500)
+
+  file     StoredFile          @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  rows     RegisterImportRow[]
+  holdings Shareholding[]
+
+  @@index([companyId, createdAt(sort: Desc)])
+  @@map("register_imports")
+}
+
+enum ImportRowStatus {
+  VALID
+  ERROR
+}
+
+enum ImportRowAction {
+  NEW
+  CHANGED
+  UNCHANGED
+  CLOSED
+  NONE
+}
+
+model RegisterImportRow {
+  id         String          @id @default(uuid(7)) @db.Uuid
+  tenantId   String          @map("tenant_id") @db.Uuid
+  companyId  String          @map("company_id") @db.Uuid
+  importId   String          @map("import_id") @db.Uuid
+  rowNumber  Int             @map("row_number")
+  raw        Json
+  normalized Json?
+  status     ImportRowStatus
+  action     ImportRowAction @default(NONE)
+  errors     String[]        @default([])
+
+  import RegisterImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@unique([importId, rowNumber])
+  @@index([importId, status])
+  @@map("register_import_rows")
+}
+
+enum FileKind {
+  REGISTER_IMPORT
+  AUTHORIZATION_DOCUMENT
+}
+
+/// Metadata for a privately stored file. Content lives in the storage driver under storage_key.
+model StoredFile {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  kind         FileKind
+  storageKey   String   @unique @map("storage_key") @db.VarChar(200)
+  originalName String   @map("original_name") @db.VarChar(255)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  sizeBytes    Int      @map("size_bytes")
+  sha256       String   @db.VarChar(64)
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  imports       RegisterImport[]
+  corporateReps CorporateRepresentative[]
+  proxies       ProxyAuthorization[]
+
+  @@map("stored_files")
+}
+
+enum AuthorizationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVOKED
+}
+
+model CorporateRepresentative {
+  id            String              @id @default(uuid(7)) @db.Uuid
+  tenantId      String              @map("tenant_id") @db.Uuid
+  companyId     String              @map("company_id") @db.Uuid
+  shareholderId String              @map("shareholder_id") @db.Uuid
+  fullName      String              @map("full_name") @db.VarChar(160)
+  designation   String?             @db.VarChar(120)
+  email         String              @db.VarChar(254)
+  phone         String?             @db.VarChar(20)
+  /// BO/folio identities this representative may act for.
+  identityIds   String[]            @map("identity_ids") @db.Uuid
+  validFrom     DateTime            @map("valid_from") @db.Date
+  validUntil    DateTime            @map("valid_until") @db.Date
+  status        AuthorizationStatus @default(PENDING)
+  documentId    String?             @map("document_id") @db.Uuid
+  createdById   String              @map("created_by_id") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  decidedById   String?             @map("decided_by_id") @db.Uuid
+  decidedAt     DateTime?           @map("decided_at") @db.Timestamptz(3)
+  decisionNote  String?             @map("decision_note") @db.VarChar(500)
+
+  shareholder Shareholder @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
+  document    StoredFile? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, email])
+  @@map("corporate_representatives")
+}
+
+enum ProxyScope {
+  ATTEND
+  ATTEND_AND_VOTE
+}
+
+model ProxyAuthorization {
+  id                   String              @id @default(uuid(7)) @db.Uuid
+  tenantId             String              @map("tenant_id") @db.Uuid
+  companyId            String              @map("company_id") @db.Uuid
+  grantorShareholderId String              @map("grantor_shareholder_id") @db.Uuid
+  fullName             String              @map("full_name") @db.VarChar(160)
+  email                String              @db.VarChar(254)
+  phone                String?             @db.VarChar(20)
+  scope                ProxyScope
+  /// Free text until meetings exist. Phase C adds meeting_id and makes it mandatory.
+  meetingReference     String              @map("meeting_reference") @db.VarChar(160)
+  validFrom            DateTime            @map("valid_from") @db.Date
+  validUntil           DateTime            @map("valid_until") @db.Date
+  status               AuthorizationStatus @default(PENDING)
+  documentId           String?             @map("document_id") @db.Uuid
+  createdById          String              @map("created_by_id") @db.Uuid
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  decidedById          String?             @map("decided_by_id") @db.Uuid
+  decidedAt            DateTime?           @map("decided_at") @db.Timestamptz(3)
+  decisionNote         String?             @map("decision_note") @db.VarChar(500)
+
+  grantor  Shareholder @relation(fields: [grantorShareholderId], references: [id], onDelete: Restrict)
+  document StoredFile? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, email])
+  @@map("proxy_authorizations")
+}
+
+enum ParticipantKind {
+  SHAREHOLDER
+  CORPORATE_REPRESENTATIVE
+  PROXY_REPRESENTATIVE
+}
+
+/// Links a participant login to what it represents inside one company.
+model ParticipantLink {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  companyId      String          @map("company_id") @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  kind           ParticipantKind
+  shareholderId  String?         @map("shareholder_id") @db.Uuid
+  corporateRepId String?         @map("corporate_rep_id") @db.Uuid
+  proxyId        String?         @map("proxy_id") @db.Uuid
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shareholder Shareholder? @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([companyId])
+  @@map("participant_links")
+}
+
+// ─── One-time codes and development outbox ────────────────────────────
+
+enum OtpPurpose {
+  PARTICIPANT_LOGIN
+  MFA_LOGIN
+}
+
+/// A pending one-time code or MFA step. Only hashes are stored.
+model OtpChallenge {
+  id         String     @id @default(uuid(7)) @db.Uuid
+  purpose    OtpPurpose
+  /// SHA-256 of the 6-digit code (participant) or of the MFA step token.
+  secretHash String     @map("secret_hash") @db.VarChar(64)
+  /// Who is signing in. Never contains the code.
+  subject    Json
+  userId     String?    @map("user_id") @db.Uuid
+  attempts   Int        @default(0)
+  expiresAt  DateTime   @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime?  @map("consumed_at") @db.Timestamptz(3)
+  ipAddress  String?    @map("ip_address") @db.VarChar(64)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@map("otp_challenges")
+}
+
+/// DEVELOPMENT ONLY. Messages that would go out by SMS or email when no provider is configured.
+/// The API refuses to write here when NODE_ENV=production.
+model DevOutboxMessage {
+  id        String      @id @default(uuid(7)) @db.Uuid
+  channel   ContactKind
+  recipient String      @db.VarChar(254)
+  subject   String      @db.VarChar(200)
+  body      String      @db.VarChar(2000)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([createdAt(sort: Desc)])
+  @@map("dev_outbox_messages")
 }

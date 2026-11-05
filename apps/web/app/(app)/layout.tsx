@@ -1,13 +1,24 @@
 'use client';
 
+import * as React from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { Alert, Button, Skeleton } from '@irm/ui';
 import { AppShell } from '@/components/shell/app-shell';
 import { SessionProvider, useMe } from '@/lib/session';
 
 export default function SignedInLayout({ children }: { children: React.ReactNode }) {
   const me = useMe();
+  const router = useRouter();
+  const pathname = usePathname();
+  const user = me.data?.user;
 
-  if (me.isPending) {
+  // Shareholders and their representatives have their own portal.
+  const redirect = user?.kind === 'PARTICIPANT' ? '/portal' : user?.mfaSetupRequired && pathname !== '/account/security' ? '/account/security' : null;
+  React.useEffect(() => {
+    if (redirect) router.replace(redirect);
+  }, [redirect, router]);
+
+  if (me.isPending || redirect) {
     return (
       <div className="flex min-h-dvh" aria-busy="true" aria-label="Loading">
         <div className="hidden w-60 border-r border-line p-5 lg:block">

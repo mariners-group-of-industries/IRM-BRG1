@@ -6,16 +6,20 @@ This repository is a modular monolith in a pnpm monorepo.
 
 | Status | |
 |---|---|
-| Phase A, foundation | **Complete.** See [docs/ROADMAP.md](docs/ROADMAP.md) |
-| Phase B, shareholder system | Next |
+| Phase A, foundation | **Complete.** |
+| Phase B, shareholder system | **Complete.** See [docs/ROADMAP.md](docs/ROADMAP.md) |
+| Phase C, meeting management | Next |
 
 ## What works today
 
-- Staff sign-in with server-side sessions, CSRF protection, origin checks, rate limiting and account lockout.
-- Tenants (corporate groups) and companies, with isolation enforced on every API query.
-- Nine roles and 36 permissions from one shared catalogue, plus role assignment that blocks privilege escalation.
+- Staff sign-in with server-side sessions, CSRF protection, origin checks, rate limiting, account lockout and optional two-step verification (TOTP).
+- Tenants (corporate groups) and companies, with isolation enforced on every API query and by PostgreSQL row-level security on shareholder data.
+- Nine roles and 37 permissions from one shared catalogue, plus role assignment that blocks privilege escalation.
+- The shareholder register: BO and folio accounts, versioned holdings and masked personal data.
+- Register imports from CSV or Excel, with column mapping, row-by-row preview and confirmed commit.
+- Corporate representatives and proxies, which need approval by a second administrator.
+- Shareholder, representative and proxy sign-in with one-time codes, plus a participant portal with Bangla labels.
 - An append-only audit log, enforced by a PostgreSQL trigger.
-- An admin web app covering overview, tenants, companies, members, users, the permission matrix and the audit log.
 
 ## Repository layout
 
@@ -83,10 +87,29 @@ The seed creates fictitious companies and these staff accounts. They are for dev
 | director@meghnacement.example | Board Member | Meghna Cement Mills PLC |
 | cs@padmapharma.example | Company Admin | Padma Pharmaceuticals PLC |
 
+### Try the shareholder sign-in
+
+Meghna Cement Mills PLC has a small fictitious register. Find its company id on the Companies page or in the URL, then open:
+
+```
+http://localhost:3100/join/<company-id>
+```
+
+| Sign in as | Enter | Code is sent to |
+|---|---|---|
+| Shareholder | BO ID `1201950000000002` | rokeya.begum@example.com |
+| Shareholder | Folio `F-00017` | +8801811000017 |
+| Company representative | imran.hossain@deltalife.example | that email |
+| Proxy | nasima.akter@example.com | that email |
+
+No real SMS or email is sent in development. Read the code at http://localhost:3100/dev/outbox. That page and its API are disabled in production.
+
+A sample register to import is in `docs/samples/register-sample.csv`. Its last row is deliberately invalid, so you can see the error preview.
+
 ## Testing
 
 ```bash
-pnpm --filter @irm/shared test     # RBAC unit tests
+pnpm --filter @irm/shared test     # RBAC and identifier unit tests
 pnpm --filter @irm/api test        # API integration tests; rebuilds the irm_test database
 pnpm --filter @irm/web build       # production build and type check
 pnpm e2e                           # Playwright; needs the API and web servers running

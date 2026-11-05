@@ -6,10 +6,11 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY, SKIP_CSRF_KEY } from '../../common/decorators.js';
+import { ALLOW_WITHOUT_MFA_KEY, IS_PUBLIC_KEY, SKIP_CSRF_KEY } from '../../common/decorators.js';
 import type { AppRequest } from '../../common/request-context.js';
 import { env } from '../../config/env.js';
 import { AccessService } from '../access/access.service.js';
+import { MfaService } from './mfa.service.js';
 import { SESSION_COOKIE, SessionService } from './session.service.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -26,6 +27,7 @@ export class AuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly sessions: SessionService,
     private readonly access: AccessService,
+    private readonly mfa: MfaService,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -62,11 +64,19 @@ export class AuthGuard implements CanActivate {
     req.sessionToken = token;
     req.principal = {
       userId: session.user.id,
+      kind: session.user.kind,
       email: session.user.email,
+      mfaEnabled: session.user.mfaEnabled,
       fullName: session.user.fullName,
       sessionId: session.id,
       assignments: await this.access.loadAssignments(session.user.id),
     };
+
+    // Admins who must use MFA can only reach enrolment, profile and sign-out until they enrol.
+    const allowWithoutMfa = this.reflector.getAllAndOverride<boolean>(ALLOW_WITHOUT_MFA_KEY, targets) ?? false;
+    if (!allowWithoutMfa && this.mfa.setupRequired(req.principal)) {
+      throw new ForbiddenException({ statusCode: 403, message: 'Set up two-step verification to continue', code: 'MFA_SETUP_REQUIRED' });
+    }
     return true;
   }
 }

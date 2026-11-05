@@ -7,6 +7,7 @@ export const USERS = {
   groupAdmin: 'group.admin@meghna.example',
   meghnaAdmin: 'cs@meghnacement.example',
   moderator: 'moderator@meghnacement.example',
+  meetingAdmin: 'meeting.admin@meghnacement.example',
   padmaAdmin: 'cs@padmapharma.example',
 } as const;
 

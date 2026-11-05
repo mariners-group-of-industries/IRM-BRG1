@@ -4,7 +4,9 @@ import type { EffectiveAssignment, SessionAssignment } from '@irm/shared';
 /** The authenticated principal attached to each request by the AuthGuard. */
 export interface AuthPrincipal {
   userId: string;
-  email: string;
+  kind: 'STAFF' | 'PARTICIPANT';
+  email: string | null;
+  mfaEnabled: boolean;
   fullName: string;
   sessionId: string;
   assignments: (EffectiveAssignment & SessionAssignment)[];

@@ -28,7 +28,7 @@ A check passes when **any** active assignment both holds the permission and cove
 
 **Grant rule.** A user may grant role R at scope S only if they hold an assignment that covers S, includes `role.assign`, and whose role lists R in its assignable roles. A company-scoped assignment can never grant at tenant or platform scope.
 
-**Participant roles** are never granted by hand. They are created by shareholder verification, corporate authorization and proxy approval in Phase B. Every participation action additionally requires a **voting entitlement** for the specific meeting. A role alone never allows a vote.
+**Participant roles** are never granted by hand. Since Phase B, they are created automatically when a person signs in with a one-time code that proves they are a registered shareholder, or the subject of an approved and currently valid corporate representative or proxy authorization. Revoking that authorization removes the role and ends the person's sessions at once. Every participation action additionally requires a **voting entitlement** for the specific meeting. A role alone never allows a vote.
 
 ## Permission matrix
 
@@ -50,6 +50,7 @@ PA is Platform Admin, CA is Company Admin, MA is Meeting Admin, BM is Board Memb
 | shareholder.read | | ✓ | ✓ | | | | |
 | shareholder.import | | ✓ | | | | | |
 | shareholder.pii.read | | ✓ | | | | | |
+| authorization.manage | | ✓ | | | | | |
 | meeting.read | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | meeting.create | | ✓ | | | | | |
 | meeting.update | | ✓ | | | | | |

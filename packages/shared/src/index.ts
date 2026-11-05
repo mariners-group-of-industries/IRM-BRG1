@@ -4,3 +4,5 @@ export * from './rbac.js';
 export * from './grants.js';
 export * from './schemas.js';
 export * from './api-types.js';
+export * from './shareholder.js';
+export * from './shareholder-types.js';

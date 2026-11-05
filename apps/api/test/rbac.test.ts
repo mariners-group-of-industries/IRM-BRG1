@@ -140,3 +140,30 @@ describe('role assignment and privilege boundaries', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('adding a company member in one step', () => {
+  let app: INestApplication;
+  beforeAll(async () => {
+    app = await bootApp();
+  });
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('creates the account and role together, or neither', async () => {
+    const meghna = await login(app, USERS.meghnaAdmin);
+    const items = (await meghna.get('/companies').expect(200)).body.items as { id: string }[];
+    const cement = items[0]!.id;
+    const ok = await meghna
+      .post(`/companies/${cement}/members`, { email: 'one.step@meghnacement.example', fullName: 'One Step', password: 'Str0ng!Passphrase', roleKey: 'MODERATOR' })
+      .expect(201);
+    expect(ok.body.assignmentId).toBeDefined();
+
+    // A role the caller may not grant fails without creating the account.
+    await meghna
+      .post(`/companies/${cement}/members`, { email: 'no.account@meghnacement.example', fullName: 'No Account', password: 'Str0ng!Passphrase', roleKey: 'SHAREHOLDER' })
+      .expect(403);
+    const prisma = app.get(PrismaService);
+    expect(await prisma.user.findUnique({ where: { email: 'no.account@meghnacement.example' } })).toBeNull();
+  });
+});

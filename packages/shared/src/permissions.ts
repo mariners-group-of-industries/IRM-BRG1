@@ -27,6 +27,8 @@ export const PERMISSIONS = {
   SHAREHOLDER_READ: 'shareholder.read',
   SHAREHOLDER_IMPORT: 'shareholder.import',
   SHAREHOLDER_PII_READ: 'shareholder.pii.read',
+  /** Create, approve and revoke corporate representatives and proxies. */
+  AUTHORIZATION_MANAGE: 'authorization.manage',
 
   // Meetings (Phase C)
   MEETING_READ: 'meeting.read',
@@ -81,6 +83,7 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   'shareholder.read': 'View shareholder register (masked identifiers)',
   'shareholder.import': 'Import shareholder registers',
   'shareholder.pii.read': 'View unmasked shareholder personal data',
+  'authorization.manage': 'Manage corporate representatives and proxies',
   'meeting.read': 'View meetings',
   'meeting.create': 'Create AGM/EGM meetings',
   'meeting.update': 'Edit meeting configuration',

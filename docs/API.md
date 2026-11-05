@@ -42,4 +42,57 @@ Base path: `/api/v1`. Interactive OpenAPI docs are served at `/api/docs` outside
 | GET | `/dashboard/summary` | session | Counts and lists scoped to the caller |
 | GET | `/audit?page=&action=` | `audit.read` or `platform.audit.read` | `action` is a prefix filter such as `auth.` |
 
-Request and response TypeScript types are in `packages/shared/src/api-types.ts`.
+| POST | `/companies/:id/members` | `user.manage` plus the grant rule | `{ email, fullName, password, roleKey }`. Creates the account and role in one transaction. |
+
+## Endpoints (Phase B)
+
+### Staff two-step verification
+
+| Method | Path | Access | Notes |
+|---|---|---|---|
+| POST | `/auth/login` | public | Returns `{ mfaRequired: true, mfaToken }` and no cookie when MFA is on |
+| POST | `/auth/mfa/verify` | public | `{ mfaToken, code }`. The code is a 6-digit TOTP or a recovery code. Sets the session. |
+| POST | `/auth/mfa/setup` | session | Returns `{ secret, otpauthUrl, qrDataUrl }`. Not active until enabled. |
+| POST | `/auth/mfa/enable` | session | `{ code }`. Returns 10 recovery codes once. |
+| POST | `/auth/mfa/disable` | session | `{ code }` |
+
+Responses blocked by MFA enforcement return 403 with `"code": "MFA_SETUP_REQUIRED"`.
+
+### Shareholder register
+
+Every company-scoped path is `/companies/:companyId/...`.
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `register/summary` | `shareholder.read` | Counts, shares by class, last import |
+| GET / POST | `share-classes` | read / `shareholder.import` | `{ code, name, votesPerShare }` |
+| GET | `shareholders?q=&type=&page=` | `shareholder.read` | `q` matches name or an exact BO ID or folio. Masked without `shareholder.pii.read`. |
+| GET | `shareholders/:id` | `shareholder.read` | Accounts, contacts, current holdings and history. Unmasked views are audited. |
+| GET / POST | `imports` | `shareholder.import` | POST is multipart with field `file` (CSV or XLSX, up to 25 MB) |
+| GET | `imports/:id` | `shareholder.import` | Includes `suggestedMapping` and `sampleRows` before commit |
+| POST | `imports/:id/validate` | `shareholder.import` | `{ mapping, mode: FULL|DELTA, asOfDate }` |
+| GET | `imports/:id/rows?filter=ERROR|NEW|CHANGED|UNCHANGED|CLOSED&page=` | `shareholder.import` | 50 per page |
+| POST | `imports/:id/commit` | `shareholder.import` | `{ acceptErrors?: boolean }`. A FULL import with errors is always refused. Returns 409 if the register changed after validation. |
+| POST | `imports/:id/cancel` | `shareholder.import` | |
+
+### Corporate representatives and proxies
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `corporate-representatives`, `proxies` | `shareholder.read` | |
+| POST | `corporate-representatives` | `authorization.manage` | Multipart: `shareholderId`, `fullName`, `designation?`, `email`, `phone?`, `identityIds` (repeated), `validFrom`, `validUntil`, plus an optional `document` (PDF, PNG or JPEG, up to 10 MB) |
+| POST | `proxies` | `authorization.manage` | Multipart: `grantorShareholderId`, `fullName`, `email`, `phone?`, `scope`, `meetingReference`, `validFrom`, `validUntil`, plus an optional `document` |
+| POST | `:kind/:id/decision` | `authorization.manage` | `{ decision: APPROVE|REJECT|REVOKE, note? }`. The creator cannot approve. |
+| GET | `:kind/:id/document` | `authorization.manage` | Download. Audited. |
+
+### Participants
+
+| Method | Path | Access | Notes |
+|---|---|---|---|
+| GET | `/participant/companies/:id` | public | Company name for the sign-in page |
+| POST | `/participant/otp/request` | public | `{ kind: SHAREHOLDER, companyId, identifier }`, or `{ kind: CORPORATE_REPRESENTATIVE|PROXY_REPRESENTATIVE, companyId, email }`. Always returns the same message. |
+| POST | `/participant/otp/verify` | public | `{ challengeId, code }`. Sets the session. |
+| GET | `/participant/me` | participant session | What the person represents, per company |
+| GET | `/dev/outbox` | public, development only | Returns 404 in production |
+
+Request and response TypeScript types are in `packages/shared/src/api-types.ts` and `shareholder-types.ts`.

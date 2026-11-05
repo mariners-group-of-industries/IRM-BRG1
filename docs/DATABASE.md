@@ -33,7 +33,28 @@ CREATE TRIGGER audit_logs_no_update BEFORE UPDATE OR DELETE ON audit_logs ...
 
 Integration tests cover each of these constraints.
 
-## 2. Target model (Phases B to F)
+## 1a. Implemented in Phase B
+
+Tables: `share_classes`, `shareholders`, `shareholder_identities`, `shareholder_contacts`, `shareholdings`, `register_imports`, `register_import_rows`, `stored_files`, `corporate_representatives`, `proxy_authorizations` and `participant_links`. Also `otp_challenges` and `dev_outbox_messages`, which are not company-scoped. Users gained `kind` (STAFF or PARTICIPANT), a nullable `email` for participants, and MFA columns.
+
+Hand-written SQL in the `phase_b_shareholders` migration:
+
+| Rule | Mechanism |
+|---|---|
+| Tenant and company agree on every company-owned row | Composite FK `(company_id, tenant_id)` to `companies(id, tenant_id)` on all 11 tables |
+| One current holding per account and class | Partial unique index `WHERE valid_to IS NULL` |
+| Holdings history is immutable | Trigger allows only closing a current row. Other updates and all deletes are rejected. |
+| No negative holdings; valid date ranges | CHECK constraints |
+| One active copy of a contact | Partial unique index `WHERE retired_at IS NULL` |
+| Participant links reference exactly one thing | CHECK by kind, plus partial unique indexes |
+| Staff accounts have an email | CHECK `kind <> 'STAFF' OR email IS NOT NULL` |
+| Row-level security | See below |
+
+**Row-level security.** All 11 company-owned Phase B tables have RLS enabled. A policy for role `irm_app` allows only rows where `company_id = ANY(irm_company_ids())`, which parses the transaction setting `app.company_ids`. With no setting, no rows are visible. The API's `PrismaService.scoped(companyIds, fn)` opens a transaction, runs `SET LOCAL ROLE irm_app`, and sets `app.company_ids` before running `fn`. A mistaken or hand-written query inside that transaction cannot see or write another company's rows. The migration creates `irm_app` as a NOLOGIN role and grants it table privileges.
+
+**Shares** are `bigint` and travel as strings in the API, because totals can exceed 2^53.
+
+## 2. Target model (Phases C to F)
 
 ```mermaid
 erDiagram
@@ -123,7 +144,7 @@ Ballot choices are readable only by the voting module's tally function and by a 
 
 1. Every company-owned table has `tenant_id` and `company_id`, with a composite FK to `companies(id, tenant_id)`.
 2. Every query goes through `AccessService` filters or assertions in the API layer.
-3. **Planned for Phase B:** PostgreSQL row-level security on the shareholder, voting and communication tables. The API sets `app.tenant_ids` and `app.company_ids` per transaction as a second line of defence.
+3. PostgreSQL row-level security on shareholder tables, live since Phase B, with voting and communication tables to follow. It works through `prisma.scoped` and the `irm_app` role described above.
 
 ## 4. Migrations and seed
 

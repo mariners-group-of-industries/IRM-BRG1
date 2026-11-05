@@ -33,7 +33,7 @@ export class SessionService {
   async validate(token: string) {
     const session = await this.prisma.session.findUnique({
       where: { tokenHash: sha256(token) },
-      include: { user: { select: { id: true, email: true, fullName: true, status: true } } },
+      include: { user: { select: { id: true, kind: true, email: true, fullName: true, status: true, mfaEnabled: true } } },
     });
     if (!session || session.revokedAt) return null;
     const now = Date.now();

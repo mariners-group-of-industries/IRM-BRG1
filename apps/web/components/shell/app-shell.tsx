@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog as DialogPrimitive } from 'radix-ui';
-import { ChevronsUpDown, LogOut, Menu as MenuIcon, X } from 'lucide-react';
+import { ChevronsUpDown, LogOut, Menu as MenuIcon, ShieldCheck, X } from 'lucide-react';
 import { cn, Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@irm/ui';
 import { Brand } from '@/components/brand';
 import { api, setCsrfToken } from '@/lib/api';
@@ -99,6 +99,10 @@ function UserMenu() {
           </MenuLabel>
         ))}
         <MenuSeparator />
+        <MenuItem onSelect={() => router.push('/account/security')}>
+          <ShieldCheck aria-hidden />
+          Security{!user.mfaEnabled && <span className="ml-auto text-2xs text-warning">2FA off</span>}
+        </MenuItem>
         <MenuItem onSelect={signOut} disabled={busy}>
           <LogOut aria-hidden />
           Sign out

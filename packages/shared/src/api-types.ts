@@ -14,8 +14,12 @@ export interface SessionAssignment {
 
 export interface SessionUser {
   id: string;
-  email: string;
+  kind: 'STAFF' | 'PARTICIPANT';
+  email: string | null;
   fullName: string;
+  mfaEnabled: boolean;
+  /** True when policy requires this user to enrol in MFA before using the app. */
+  mfaSetupRequired: boolean;
   assignments: SessionAssignment[];
 }
 

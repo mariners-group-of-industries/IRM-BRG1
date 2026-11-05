@@ -95,6 +95,7 @@ export class IdentityController {
     const search = q?.trim();
     const where: Prisma.UserWhereInput = {
       AND: [
+        { kind: 'STAFF' },
         this.access.userFilter(p),
         companyId ? { assignments: { some: { revokedAt: null, companyId } } } : {},
         search
@@ -132,7 +133,7 @@ export class IdentityController {
     return {
       items: rows.map((u) => ({
         id: u.id,
-        email: u.email,
+        email: u.email ?? '',
         fullName: u.fullName,
         status: u.status,
         lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
@@ -190,6 +191,53 @@ export class IdentityController {
       return u;
     });
     return { id: user.id, email: user.email, fullName: user.fullName };
+  }
+
+  /**
+   * Creates a staff account and grants it a company role in one transaction, so a
+   * failure never leaves an account without a role. Same rules as /users and /assignments.
+   */
+  @Post('companies/:companyId/members')
+  async addMember(
+    @Principal() p: AuthPrincipal,
+    @Param('companyId', new ParseUUIDPipe()) companyId: string,
+    @Body() body: unknown,
+    @Meta() meta: RequestMeta,
+  ) {
+    const company = await this.access.assertCompany(p, companyId, PERMISSIONS.USER_MANAGE, meta);
+    const input = parseBody(createUserSchema.extend({ roleKey: assignSchema.shape.roleKey }), body);
+    const def = ROLE_BY_KEY.get(input.roleKey as RoleKey)!;
+    if (!canAssignRole(p.assignments, def.key, { scope: 'COMPANY', tenantId: company.tenantId, companyId })) {
+      await this.audit.record({
+        action: 'role.assign',
+        outcome: 'DENIED',
+        actorUserId: p.userId,
+        actorEmail: p.email,
+        tenantId: company.tenantId,
+        companyId,
+        metadata: { roleKey: def.key, scope: 'COMPANY', reason: 'role_not_assignable' },
+        meta,
+      });
+      throw new ForbiddenException(`You are not allowed to grant the ${def.name} role here`);
+    }
+    const policy = this.passwords.policyError(input.password);
+    if (policy) throw new BadRequestException({ message: 'Validation failed', errors: { password: [policy] } });
+    if (await this.prisma.user.findUnique({ where: { email: input.email }, select: { id: true } })) {
+      throw new ConflictException('A user with this email already exists');
+    }
+    const passwordHash = await this.passwords.hash(input.password);
+    const role = await this.prisma.role.findUniqueOrThrow({ where: { key: def.key } });
+    const created = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.user.create({ data: { email: input.email, fullName: input.fullName, passwordHash } });
+      const a = await tx.userRoleAssignment.create({
+        data: { userId: u.id, roleId: role.id, scope: 'COMPANY', tenantId: company.tenantId, companyId, grantedById: p.userId },
+      });
+      const base = { outcome: 'SUCCESS' as const, actorUserId: p.userId, actorEmail: p.email, tenantId: company.tenantId, companyId, targetType: 'user', targetId: u.id, meta };
+      await this.audit.record({ ...base, action: 'user.create', metadata: { email: u.email } }, tx);
+      await this.audit.record({ ...base, action: 'role.assign', metadata: { roleKey: def.key, scope: 'COMPANY', assignmentId: a.id, userEmail: u.email } }, tx);
+      return { userId: u.id, assignmentId: a.id };
+    });
+    return created;
   }
 
   /**

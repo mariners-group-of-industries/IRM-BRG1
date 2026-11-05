@@ -19,3 +19,7 @@ export const Principal = createParamDecorator((_: unknown, ctx: ExecutionContext
 export const Meta = createParamDecorator((_: unknown, ctx: ExecutionContext): RequestMeta => {
   return requestMeta(ctx.switchToHttp().getRequest<AppRequest>());
 });
+
+export const ALLOW_WITHOUT_MFA_KEY = 'irm:allowWithoutMfa';
+/** Routes an admin may use before completing mandatory MFA enrolment (sign-out, profile, enrolment). */
+export const AllowWithoutMfa = () => SetMetadata(ALLOW_WITHOUT_MFA_KEY, true);

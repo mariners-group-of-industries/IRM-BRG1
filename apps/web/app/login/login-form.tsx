@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { Eye, EyeOff } from 'lucide-react';
-import { loginSchema, type LoginInput } from '@irm/shared';
+import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { loginSchema, type LoginInput, type LoginResponse } from '@irm/shared';
 import { Alert, Button, Field, Input } from '@irm/ui';
 import { api, ApiError, setCsrfToken } from '@/lib/api';
 
@@ -22,6 +22,7 @@ export function LoginForm() {
   const qc = useQueryClient();
   const [error, setError] = React.useState<string | null>(null);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [mfaToken, setMfaToken] = React.useState<string | null>(null);
   const expired = params.get('expired') === '1';
 
   const form = useForm<LoginInput>({
@@ -29,21 +30,33 @@ export function LoginForm() {
     defaultValues: { email: '', password: '' },
   });
 
+  const finish = (res: LoginResponse) => {
+    setCsrfToken(res.csrfToken ?? null);
+    qc.clear();
+    router.replace(safeNext(params.get('next')));
+  };
+
+  const describe = (e: unknown) =>
+    e instanceof ApiError && e.status === 429
+      ? 'Too many sign-in attempts. Wait a minute and try again.'
+      : e instanceof ApiError
+        ? e.message
+        : 'Unable to reach the server. Check your connection.';
+
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
-      const res = await api.post<{ csrfToken: string }>('/auth/login', values);
-      setCsrfToken(res.csrfToken);
-      qc.clear();
-      router.replace(safeNext(params.get('next')));
+      const res = await api.post<LoginResponse>('/auth/login', values);
+      if (res.mfaRequired && res.mfaToken) setMfaToken(res.mfaToken);
+      else finish(res);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 429) {
-        setError('Too many sign-in attempts. Wait a minute and try again.');
-      } else {
-        setError(e instanceof ApiError ? e.message : 'Unable to reach the server. Check your connection.');
-      }
+      setError(describe(e));
     }
   });
+
+  if (mfaToken) {
+    return <MfaStep token={mfaToken} onDone={finish} onBack={() => (setMfaToken(null), form.setValue('password', ''))} />;
+  }
 
   const { errors, isSubmitting } = form.formState;
 
@@ -81,6 +94,60 @@ export function LoginForm() {
       <Button type="submit" size="lg" loading={isSubmitting} className="mt-1 w-full">
         {isSubmitting ? 'Signing in…' : 'Sign in'}
       </Button>
+    </form>
+  );
+}
+
+function MfaStep({ token, onDone, onBack }: { token: string; onDone: (r: LoginResponse) => void; onBack: () => void }) {
+  const [code, setCode] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [recovery, setRecovery] = React.useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      onDone(await api.post<LoginResponse>('/auth/mfa/verify', { mfaToken: token, code: code.trim() }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to reach the server.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <ShieldCheck className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+        <div>
+          <p className="text-sm font-medium text-ink">Two-step verification</p>
+          <p className="text-[0.8125rem] text-ink-3">
+            {recovery ? 'Enter one of your recovery codes. Each code works once.' : 'Enter the 6-digit code from your authenticator app.'}
+          </p>
+        </div>
+      </div>
+      {error && <Alert tone="danger">{error}</Alert>}
+      <Field label={recovery ? 'Recovery code' : 'Verification code'} htmlFor="mfa-code">
+        <Input
+          id="mfa-code"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          autoComplete="one-time-code"
+          inputMode={recovery ? 'text' : 'numeric'}
+          maxLength={recovery ? 11 : 6}
+          placeholder={recovery ? 'xxxxx-xxxxx' : '123456'}
+          className="text-center font-mono text-lg tracking-[0.3em]"
+          autoFocus
+        />
+      </Field>
+      <Button type="submit" size="lg" loading={busy} className="w-full">Verify</Button>
+      <div className="flex justify-between text-sm">
+        <button type="button" onClick={onBack} className="text-ink-3 hover:text-ink">Back</button>
+        <button type="button" onClick={() => (setRecovery((r) => !r), setCode(''))} className="text-accent hover:underline">
+          {recovery ? 'Use authenticator code' : 'Use a recovery code'}
+        </button>
+      </div>
     </form>
   );
 }

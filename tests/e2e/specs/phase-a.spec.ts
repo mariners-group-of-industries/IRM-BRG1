@@ -44,7 +44,8 @@ test.describe('platform administrator', () => {
     const stats = page.locator('dl').first();
     await expect(stats.getByText('Tenants', { exact: true })).toBeVisible();
     await expect(stats.getByText('Companies', { exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Padma Pharmaceuticals PLC' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recently added companies' })).toBeVisible();
+    await expect(page.locator('section', { has: page.getByRole('heading', { name: 'Recently added companies' }) }).locator('tbody tr').first()).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await shot(page, '03-dashboard-platform');

@@ -21,6 +21,12 @@ API (`apps/api/.env`, validated at boot by `src/config/env.ts`):
 | `SESSION_TTL_HOURS`, `SESSION_IDLE_MINUTES` | no | Default 12 hours and 60 minutes |
 | `LOGIN_MAX_FAILURES`, `LOGIN_LOCK_MINUTES` | no | Default 5 failures and 15 minutes |
 | `PORT` | no | Default 4000 |
+| `MFA_ENCRYPTION_KEY` | yes | 32 random bytes, base64. Encrypts TOTP secrets. Losing it disables every enrolled authenticator. |
+| `MFA_ENFORCE_FOR_ADMINS` | prod: true | Forces Platform and Company Admins to enrol |
+| `STORAGE_DIR` | yes | Private directory for uploaded registers and documents (local-disk driver). Back it up with the database. |
+| `OTP_DELIVERY` | yes | Only `dev-outbox` exists today, and it is refused in production. A real SMS and email provider must be added before go-live. |
+| `OTP_TTL_MINUTES`, `OTP_MAX_ATTEMPTS` | no | Default 5 and 5 |
+| `LOGIN_RATE_LIMIT_PER_MINUTE` | no | Default 10. Raise only for local browser-test runs. |
 
 Web: `API_ORIGIN` is the internal URL the Next.js server proxies `/api/v1` to.
 
@@ -38,6 +44,13 @@ pnpm --filter @irm/web start
 ```
 
 Run the API and web behind a TLS-terminating reverse proxy that serves both on one public origin. Route `/api/v1/*` to the API or let Next.js rewrite it. The API trusts one proxy hop for client IPs.
+
+## Database roles and row-level security
+
+The Phase B migration creates the NOLOGIN role `irm_app` and grants it to the migrating role. Company-scoped API transactions switch to it, so RLS policies apply. On managed PostgreSQL:
+
+1. Run migrations as the schema owner. Creating `irm_app` needs CREATEROLE.
+2. Recommended: run the API as a separate login role that is **not** the table owner and is a member of `irm_app`.
 
 ## Docker Compose (local services)
 

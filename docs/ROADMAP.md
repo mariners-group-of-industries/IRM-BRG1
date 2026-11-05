@@ -21,21 +21,39 @@ Delivered: monorepo, PostgreSQL and Prisma, staff authentication, tenants and co
 | Setup documentation complete | Done | README, CLAUDE.md, docs/ |
 
 Known limits:
-- Staff MFA is designed but not built. It is scheduled for Phase B and required before production.
+- Staff MFA was delivered in Phase B.
 - Users are created with an admin-set initial password, because email invitations need an email provider.
-- "Add member" creates the account and then the role in two calls. If the second call fails, an account without a role remains. Phase B moves this into one transactional endpoint.
+- "Add member" used two calls, so a failure could leave an account without a role. Phase B replaced it with one transactional endpoint.
 
-## Phase B: Shareholder system (next)
+## Phase B: Shareholder system (complete, 2026-11-05)
 
-Scope: share classes, shareholders, identities, contacts, versioned holdings, the CSV/XLSX import pipeline with mapping, validation, preview, confirmation and history, corporate representative and proxy authorizations, shareholder OTP sign-in, staff TOTP MFA, PII masking, row-level security, and private object storage.
+Delivered:
+- Share classes, shareholders (individual and corporate), BO and folio accounts, register contacts, and versioned holdings.
+- A register import pipeline for CSV and XLSX: upload, column mapping with suggestions, row validation, duplicate detection, preview, confirmed commit, cancel and history.
+- Corporate representatives and proxies with documents, four-eyes approval, rejection and revocation.
+- Shareholder, representative and proxy sign-in by one-time code, plus a participant portal.
+- Staff two-step verification (TOTP) with recovery codes and optional enforcement for admins.
+- PII masking, private file storage, and PostgreSQL row-level security on all shareholder tables.
 
-Acceptance:
-- Importing a 50,000-row register previews in under 30 seconds. Errors are reported per row. Nothing is overwritten without confirmation, and history is kept.
-- A shareholder can sign in only with an OTP sent to a verified contact. Failed lookups do not reveal whether a holding exists.
-- A proxy outside its meeting scope or past expiry cannot act. This is covered by tests.
-- RLS blocks cross-company reads even with a hand-written query.
+| Acceptance criterion | Status | Evidence |
+|---|---|---|
+| 50,000-row register previews in under 30 s | Done | 9.5 s preview, 31.5 s commit. A re-import of the same file found 50,000 unchanged rows (`apps/api/scripts/perf-import.mjs`). |
+| Per-row errors, nothing overwritten without confirmation, history kept | Done | `register.test.ts`: errors, duplicates, Excel precision loss, confirmation, versioning, immutable history trigger |
+| OTP sign-in only to a verified contact; failed lookups reveal nothing | Done | `participants.test.ts`: identical responses, unverifiable decoy challenges, attempt and request limits |
+| Proxy outside scope or past expiry cannot act | Done | Expired, pending and revoked proxies and representatives tested |
+| RLS blocks cross-company reads even with hand-written SQL | Done | `register.test.ts`: raw SQL count and a cross-company insert under the restricted role |
 
-## Phase C: Meeting management
+Test totals: 18 shared unit tests, 71 API integration tests and 30 Playwright tests, on desktop and mobile.
+
+Known limits:
+- **Message delivery.** Sign-in codes go to a development outbox page. Real SMS and email providers are needed before production, and the API refuses to boot in production without one.
+- **Storage.** Files use the local-disk storage driver. The S3-compatible driver is designed behind the same interface but not built, because no object store is available here.
+- **Meeting link for proxies.** Proxies carry a free-text meeting reference. Phase C adds the meeting link and makes it mandatory.
+- **RLS coverage.** RLS applies inside the API's company-scoped transactions, which switch to the restricted `irm_app` role. For defence in depth, production should also run the API under a non-owner database role. See DEPLOYMENT.md.
+- **Approval needs two admins.** Four-eyes approval needs a second administrator with authorization rights. A company with a single admin cannot approve authorizations until a group admin or second admin is added.
+- **Register contacts.** Contacts imported from the register count as verified. Manual contact editing is not built yet.
+
+## Phase C: Meeting management (next)
 
 Meetings, the state machine, agenda and resolutions, documents, rules configuration with schema validation, participant registration, the record-date snapshot, and the meeting control center.
 

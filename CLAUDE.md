@@ -21,7 +21,14 @@ pnpm e2e                               # needs API and web running
 pnpm --filter @irm/api exec prisma migrate dev --name <name> --create-only   # then review the SQL
 ```
 
-`prisma migrate dev` can hang waiting for a prompt in non-interactive shells. Create migrations with `--create-only`, review them, then apply with `prisma migrate deploy`.
+`prisma migrate dev` can hang in non-interactive shells. Generate SQL by diffing against the dev database, review it, append hand-written constraints, then apply it:
+
+```bash
+pnpm --filter @irm/api exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script > prisma/migrations/<timestamp>_<name>/migration.sql
+pnpm --filter @irm/api exec prisma migrate deploy
+```
+
+The diff does not know about hand-written SQL objects such as composite FKs, partial indexes, triggers and RLS policies. **Delete any DROP it emits for them.**
 
 ## Non-negotiable rules
 
@@ -34,6 +41,11 @@ pnpm --filter @irm/api exec prisma migrate dev --name <name> --create-only   # t
 7. **Legally sensitive rules are configuration, not code constants.** Examples are quorum, poll-demand thresholds, vote changes and proxy limits. See `docs/VOTING_RULES.md`.
 8. **Never claim a test passed without running it.**
 9. **Destructive database changes need human approval.** This covers dropping columns, rewriting data and resetting the dev database.
+10. **Read and write shareholder data only through `prisma.scoped([companyId], tx => ...)`.** That transaction switches to the restricted `irm_app` role, so row-level security applies. New company-owned tables need `tenant_id`, `company_id`, the composite FK, and an RLS policy in their migration.
+11. **Shareholder identifiers and contacts are masked** unless the caller has `shareholder.pii.read` for that company. Unmasked detail views are audited.
+12. **Never trust uploaded files.** Detect the type with `sniffFileType`, store through `StorageService`, and serve only through authorized endpoints.
+13. **Holdings are versioned.** Close the current row (`valid_to`) and insert a new one. A trigger blocks every other update and all deletes.
+14. **Sign-in codes.** Never log or audit a one-time code, and keep responses identical whether or not an account matched.
 
 ## Conventions
 

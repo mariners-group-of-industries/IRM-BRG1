@@ -20,18 +20,32 @@
 | Secrets | Environment variables only. Env is validated at boot. Production refuses non-secure cookies. | Code review |
 | Platform admin limits | No shareholder PII, ballot or meeting operation permissions. | Shared unit tests |
 
-## 2. Planned controls
+## 2. Implemented controls (Phase B)
+
+| Control | Implementation | Verified by |
+|---|---|---|
+| Participant one-time codes | 6 random digits, stored as an HMAC bound to the challenge id. 5-minute TTL, 5 attempts, single use (conditional update). At most 3 requests per account per 15 minutes, and 5 per minute per IP. | `participants.test.ts` |
+| No account enumeration | Identical response for known and unknown accounts. Unknown accounts get a decoy challenge that no code can satisfy. Codes go only to contacts on the register or to the email on an approved authorization. | `participants.test.ts` |
+| Codes never logged | Bodies exist only in the dev outbox table. Audit metadata stores masked identifiers and no codes. | `participants.test.ts` |
+| Staff two-step verification | TOTP (RFC 6238). The secret is AES-256-GCM encrypted with `MFA_ENCRYPTION_KEY`. Replays of a used time step are rejected. 10 single-use recovery codes are stored as SHA-256. Password sign-in returns a 5-minute step token and no cookie. | `mfa.test.ts`, Playwright |
+| MFA enforcement | `MFA_ENFORCE_FOR_ADMINS=true` blocks Platform and Company Admins from everything except enrolment, profile and sign-out until they enrol. | `mfa.test.ts` |
+| Row-level security | `irm_app` role and policies on 11 tables. The API switches role inside company-scoped transactions. | `register.test.ts` |
+| PII masking | BO IDs, folios, phones and emails are masked without `shareholder.pii.read`. Unmasked shareholder views are audited. | `register.test.ts`, Playwright |
+| Secure uploads | Magic-byte sniffing (CSV/XLSX for registers; PDF/PNG/JPEG for documents). 25 MB and 10 MB limits. Random storage keys outside the web root. Downloads only through authorized, audited endpoints with `Content-Disposition: attachment`. | `register.test.ts`, `participants.test.ts` |
+| Authorization four-eyes rule | The creator of a representative or proxy cannot approve it. Decisions use conditional updates, so concurrent decisions cannot both apply. | `participants.test.ts` |
+| Immediate revocation | Revoking a representative or proxy removes the participant role and ends that person's sessions. | `participants.test.ts` |
+| Immutable holdings | Database trigger | `register.test.ts` |
+
+## 3. Planned controls
 
 | Phase | Control |
 |---|---|
-| B | Shareholder OTP: 6 digits, stored hashed, 5-minute TTL, 5 attempts, per-identifier and per-IP limits, never logged. MFA (TOTP) for staff with WebAuthn later. Mandatory for Platform and Company Admins before production. |
-| B | PostgreSQL row-level security on shareholder, voting and communication tables. |
-| B | Secure uploads: type sniffing, size limits, pre-signed private object storage, malware scan hook, and no public buckets. |
-| B | PII masking: BO IDs shown as `1201****5678` unless the user has `shareholder.pii.read`. |
+| Before production | A real SMS and email provider. The dev outbox is refused at production boot. An S3-compatible storage driver with server-side encryption, plus a malware scan hook on uploads. The API database role should be non-owner, so RLS also covers code paths outside `scoped()`. |
+| C | Staff WebAuthn (passkeys) as a stronger second factor. |
 | E | Ballot secrecy, privileged access grants (time-boxed, justified, dual-approved, audited) and hash-chained vote audit. |
 | F | Dependency and secret scanning in CI, a DAST pass, a penetration test before go-live, and a backup and restore drill. |
 
-## 3. Threat model summary
+## 4. Threat model summary
 
 | Threat | Mitigation |
 |---|---|
@@ -43,6 +57,6 @@
 | CSRF or clickjacking | CSRF token, origin check, SameSite cookies, `X-Frame-Options: DENY`. |
 | Log leakage | Metadata redaction. Tokens, OTPs and passwords never logged. Request ids for correlation. |
 
-## 4. Reporting a vulnerability
+## 5. Reporting a vulnerability
 
 Report issues privately to the platform security contact set in `DEPLOYMENT.md`. Never report them in a public issue tracker.
