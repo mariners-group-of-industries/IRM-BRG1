@@ -461,6 +461,7 @@ model RegisterImportRow {
 enum FileKind {
   REGISTER_IMPORT
   AUTHORIZATION_DOCUMENT
+  MEETING_DOCUMENT
 }
 
 /// Metadata for a privately stored file. Content lives in the storage driver under storage_key.
@@ -477,9 +478,10 @@ model StoredFile {
   uploadedById String   @map("uploaded_by_id") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  imports       RegisterImport[]
-  corporateReps CorporateRepresentative[]
-  proxies       ProxyAuthorization[]
+  imports          RegisterImport[]
+  corporateReps    CorporateRepresentative[]
+  proxies          ProxyAuthorization[]
+  meetingDocuments MeetingDocument[]
 
   @@map("stored_files")
 }
@@ -533,7 +535,9 @@ model ProxyAuthorization {
   email                String              @db.VarChar(254)
   phone                String?             @db.VarChar(20)
   scope                ProxyScope
-  /// Free text until meetings exist. Phase C adds meeting_id and makes it mandatory.
+  /// Required for new proxies since Phase C. Older proxies keep only meeting_reference.
+  meetingId            String?             @map("meeting_id") @db.Uuid
+  /// Display name of the meeting, copied from the meeting at creation.
   meetingReference     String              @map("meeting_reference") @db.VarChar(160)
   validFrom            DateTime            @map("valid_from") @db.Date
   validUntil           DateTime            @map("valid_until") @db.Date
@@ -547,8 +551,10 @@ model ProxyAuthorization {
 
   grantor  Shareholder @relation(fields: [grantorShareholderId], references: [id], onDelete: Restrict)
   document StoredFile? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  meeting  Meeting?    @relation(fields: [meetingId], references: [id], onDelete: Restrict)
 
   @@index([companyId, email])
+  @@index([meetingId])
   @@map("proxy_authorizations")
 }
 
@@ -616,4 +622,247 @@ model DevOutboxMessage {
 
   @@index([createdAt(sort: Desc)])
   @@map("dev_outbox_messages")
+}
+
+// ═══ Phase C: meeting management ═══════════════════════════════════════
+// Company-owned tables carry tenant_id and company_id, a composite FK to
+// companies(id, tenant_id), and an RLS policy (see the phase_c migration).
+
+enum MeetingType {
+  AGM
+  EGM
+}
+
+enum MeetingMode {
+  VIRTUAL
+  HYBRID
+}
+
+enum MeetingState {
+  DRAFT
+  SCHEDULED
+  REGISTRATION_OPEN
+  LIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+model Meeting {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  tenantId        String       @map("tenant_id") @db.Uuid
+  companyId       String       @map("company_id") @db.Uuid
+  type            MeetingType
+  title           String       @db.VarChar(200)
+  description     String?      @db.VarChar(2000)
+  noticeText      String?      @map("notice_text")
+  mode            MeetingMode  @default(VIRTUAL)
+  venue           String?      @db.VarChar(300)
+  scheduledStart  DateTime     @map("scheduled_start") @db.Timestamptz(3)
+  timezone        String       @default("Asia/Dhaka") @db.VarChar(64)
+  recordDate      DateTime     @map("record_date") @db.Date
+  state           MeetingState @default(DRAFT)
+  /// Optimistic concurrency counter, incremented on every change.
+  version         Int          @default(1)
+  /// Validated against meetingRulesSchema in @irm/shared. Locked once the meeting goes live.
+  rules           Json
+  publishedAt     DateTime?    @map("published_at") @db.Timestamptz(3)
+  snapshotTakenAt DateTime?    @map("snapshot_taken_at") @db.Timestamptz(3)
+  startedAt       DateTime?    @map("started_at") @db.Timestamptz(3)
+  endedAt         DateTime?    @map("ended_at") @db.Timestamptz(3)
+  createdById     String       @map("created_by_id") @db.Uuid
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  transitions  MeetingStateTransition[]
+  agendaItems  AgendaItem[]
+  documents    MeetingDocument[]
+  staff        MeetingStaff[]
+  participants MeetingParticipant[]
+  snapshots    ShareholdingSnapshot[]
+  entitlements VotingEntitlement[]
+  proxies      ProxyAuthorization[]
+
+  @@index([companyId, scheduledStart])
+  @@map("meetings")
+}
+
+/// Append-only history of state changes.
+model MeetingStateTransition {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  tenantId    String        @map("tenant_id") @db.Uuid
+  companyId   String        @map("company_id") @db.Uuid
+  meetingId   String        @map("meeting_id") @db.Uuid
+  fromState   MeetingState? @map("from_state")
+  toState     MeetingState  @map("to_state")
+  actorUserId String?       @map("actor_user_id") @db.Uuid
+  reason      String?       @db.VarChar(500)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+
+  @@index([meetingId, createdAt])
+  @@map("meeting_state_transitions")
+}
+
+model AgendaItem {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  meetingId   String   @map("meeting_id") @db.Uuid
+  number      String   @db.VarChar(10)
+  title       String   @db.VarChar(300)
+  description String?  @db.VarChar(5000)
+  position    Int
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  meeting    Meeting           @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  resolution Resolution?
+  documents  MeetingDocument[]
+
+  @@unique([meetingId, number])
+  @@index([meetingId, position])
+  @@map("agenda_items")
+}
+
+enum ResolutionKind {
+  ORDINARY
+  SPECIAL
+}
+
+model Resolution {
+  id                String         @id @default(uuid(7)) @db.Uuid
+  tenantId          String         @map("tenant_id") @db.Uuid
+  companyId         String         @map("company_id") @db.Uuid
+  agendaItemId      String         @unique @map("agenda_item_id") @db.Uuid
+  kind              ResolutionKind
+  text              String
+  requiresProposal  Boolean        @default(true) @map("requires_proposal")
+  requiresSeconding Boolean        @default(true) @map("requires_seconding")
+
+  agendaItem AgendaItem @relation(fields: [agendaItemId], references: [id], onDelete: Cascade)
+
+  @@map("resolutions")
+}
+
+enum MeetingDocumentKind {
+  NOTICE
+  ANNUAL_REPORT
+  FINANCIAL_STATEMENTS
+  PROXY_FORM
+  PRESENTATION
+  OTHER
+}
+
+model MeetingDocument {
+  id           String              @id @default(uuid(7)) @db.Uuid
+  tenantId     String              @map("tenant_id") @db.Uuid
+  companyId    String              @map("company_id") @db.Uuid
+  meetingId    String              @map("meeting_id") @db.Uuid
+  agendaItemId String?             @map("agenda_item_id") @db.Uuid
+  kind         MeetingDocumentKind
+  title        String              @db.VarChar(200)
+  fileId       String              @map("file_id") @db.Uuid
+  /// Visible to participants once the meeting is published.
+  published    Boolean             @default(false)
+  uploadedById String              @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  removedAt    DateTime?           @map("removed_at") @db.Timestamptz(3)
+
+  meeting    Meeting     @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  agendaItem AgendaItem? @relation(fields: [agendaItemId], references: [id], onDelete: SetNull)
+  file       StoredFile  @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@index([meetingId])
+  @@map("meeting_documents")
+}
+
+enum MeetingStaffRole {
+  BOARD_MEMBER
+  MODERATOR
+}
+
+model MeetingStaff {
+  id        String           @id @default(uuid(7)) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  companyId String           @map("company_id") @db.Uuid
+  meetingId String           @map("meeting_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  role      MeetingStaffRole
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+
+  @@unique([meetingId, userId, role])
+  @@map("meeting_staff")
+}
+
+/// Holdings frozen at the record date when registration opens. Immutable.
+model ShareholdingSnapshot {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  meetingId     String   @map("meeting_id") @db.Uuid
+  shareholderId String   @map("shareholder_id") @db.Uuid
+  identityId    String   @map("identity_id") @db.Uuid
+  shareClassId  String   @map("share_class_id") @db.Uuid
+  holdingId     String   @map("holding_id") @db.Uuid
+  quantity      BigInt
+  votesPerShare Int      @map("votes_per_share")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  meeting     Meeting            @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  entitlement VotingEntitlement?
+
+  @@unique([meetingId, identityId, shareClassId])
+  @@index([meetingId, shareholderId])
+  @@map("shareholding_snapshots")
+}
+
+/// One voting entitlement per snapshot row with votes. Used by the voting engine (Phase E). Immutable.
+model VotingEntitlement {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  meetingId     String   @map("meeting_id") @db.Uuid
+  snapshotId    String   @unique @map("snapshot_id") @db.Uuid
+  shareholderId String   @map("shareholder_id") @db.Uuid
+  identityId    String   @map("identity_id") @db.Uuid
+  weight        BigInt
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  meeting  Meeting              @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  snapshot ShareholdingSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+
+  @@index([meetingId, shareholderId])
+  @@map("voting_entitlements")
+}
+
+enum MeetingParticipantStatus {
+  REGISTERED
+  CANCELLED
+}
+
+/// A registration to attend a meeting, in one capacity, for one shareholder.
+model MeetingParticipant {
+  id             String                   @id @default(uuid(7)) @db.Uuid
+  tenantId       String                   @map("tenant_id") @db.Uuid
+  companyId      String                   @map("company_id") @db.Uuid
+  meetingId      String                   @map("meeting_id") @db.Uuid
+  userId         String                   @map("user_id") @db.Uuid
+  kind           ParticipantKind
+  shareholderId  String                   @map("shareholder_id") @db.Uuid
+  corporateRepId String?                  @map("corporate_rep_id") @db.Uuid
+  proxyId        String?                  @map("proxy_id") @db.Uuid
+  /// Entitlements this registration covers.
+  entitlementIds String[]                 @map("entitlement_ids") @db.Uuid
+  status         MeetingParticipantStatus @default(REGISTERED)
+  registeredAt   DateTime                 @default(now()) @map("registered_at") @db.Timestamptz(3)
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+
+  @@unique([meetingId, userId, kind, shareholderId])
+  @@index([meetingId, status])
+  @@map("meeting_participants")
 }

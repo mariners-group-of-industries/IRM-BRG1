@@ -7,6 +7,7 @@ import { Download, FileText, Plus, UserCheck } from 'lucide-react';
 import {
   PROXY_SCOPES,
   type CorporateRepDto,
+  type MeetingSummary,
   type Paginated,
   type ProxyDto,
   type ShareholderListItem,
@@ -357,6 +358,9 @@ function RepForm({ onDone }: { onDone: () => void }) {
 }
 
 function ProxyForm({ onDone }: { onDone: () => void }) {
+  const c = useCompany();
+  const meetings = useQuery({ queryKey: ['meetings', c.id], queryFn: () => api.get<MeetingSummary[]>(`/companies/${c.id}/meetings`) });
+  const openMeetings = (meetings.data ?? []).filter((m) => ['DRAFT', 'SCHEDULED', 'REGISTRATION_OPEN'].includes(m.state));
   const [holder, setHolder] = React.useState<ShareholderListItem | null>(null);
   const [file, setFile] = React.useState<File | null>(null);
   const { submit, pending, errors, message } = useAuthorizationSubmit('proxies', onDone);
@@ -390,8 +394,11 @@ function ProxyForm({ onDone }: { onDone: () => void }) {
             </Select>
           </Field>
         </div>
-        <Field label="Meeting" htmlFor="meetingReference" hint="The meeting named on the proxy form" error={err('meetingReference')}>
-          <Input id="meetingReference" name="meetingReference" placeholder="e.g. 36th Annual General Meeting 2026" />
+        <Field label="Meeting" htmlFor="meetingId" hint="A proxy applies only to the meeting it was lodged for" error={err('meetingId')}>
+          <Select id="meetingId" name="meetingId" defaultValue="">
+            <option value="">{meetings.isPending ? 'Loading…' : openMeetings.length ? 'Select a meeting' : 'No upcoming meeting accepts proxies'}</option>
+            {openMeetings.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+          </Select>
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Valid from" htmlFor="p-from" error={err('validFrom')}><Input id="p-from" name="validFrom" type="date" defaultValue={thisYear()} /></Field>

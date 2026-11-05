@@ -54,7 +54,21 @@ Hand-written SQL in the `phase_b_shareholders` migration:
 
 **Shares** are `bigint` and travel as strings in the API, because totals can exceed 2^53.
 
-## 2. Target model (Phases C to F)
+## 1b. Implemented in Phase C
+
+Tables: `meetings`, `meeting_state_transitions`, `agenda_items`, `resolutions`, `meeting_documents`, `meeting_staff`, `shareholding_snapshots`, `voting_entitlements` and `meeting_participants`. `proxy_authorizations.meeting_id` is required by the API for new proxies.
+
+| Rule | Mechanism |
+|---|---|
+| Every meeting child row belongs to the meeting's own company | Unique `(id, company_id)` on meetings, plus composite FKs `(meeting_id, company_id)` from all 8 child tables and from proxies |
+| History, snapshots and entitlements are immutable | `irm_immutable_row()` trigger on update and delete |
+| Hybrid meetings have a venue; snapshot quantities and weights are positive | CHECK constraints |
+| Participant registration references match its kind | CHECK on `meeting_participants` |
+| Row-level security | Same `irm_app` policy on all 9 new tables, giving 20 RLS tables in total |
+
+**Record-date snapshot.** When a meeting moves to Registration Open, one SQL statement copies, for each account and share class, the holding row with the latest `as_of_date` on or before the record date, skipping zero balances and inactive holders. Voting entitlements are then created with `weight = quantity × votes_per_share` for classes that carry votes. Because closures write a zero-share row dated to the closing import, an account that left the register before the record date is correctly excluded.
+
+## 2. Target model (Phases D to F)
 
 ```mermaid
 erDiagram

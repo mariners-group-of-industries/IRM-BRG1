@@ -299,6 +299,7 @@ export class ImportsService {
         const newIdentities: Prisma.ShareholderIdentityCreateManyInput[] = [];
         const newHoldings: Prisma.ShareholdingCreateManyInput[] = [];
         const closeHoldingIds: string[] = [];
+        const closedToZero: string[] = [];
         const nameUpdates = new Map<string, { name: string; nameBn: string | null }>();
         const contactsWanted: { shareholderId: string; kind: 'PHONE' | 'EMAIL'; value: string }[] = [];
         const groupShareholder = new Map<string, string>();
@@ -306,7 +307,9 @@ export class ImportsService {
 
         for (const r of rows) {
           if (r.action === 'CLOSED') {
-            closeHoldingIds.push((r.normalized as { closed: { holdingId: string } }).closed.holdingId);
+            const closedId = (r.normalized as { closed: { holdingId: string } }).closed.holdingId;
+            closeHoldingIds.push(closedId);
+            closedToZero.push(closedId);
             continue;
           }
           const n = r.normalized as unknown as NormalizedRow;
@@ -347,6 +350,12 @@ export class ImportsService {
 
         for (const part of chunks(newShareholders)) await tx.shareholder.createMany({ data: part });
         for (const part of chunks(newIdentities)) await tx.shareholderIdentity.createMany({ data: part });
+        // A closed holding gets a zero-share row dated to this register, so snapshots for
+        // later record dates see the account as empty rather than reusing the old balance.
+        const zeroRows = closedToZero.length
+          ? await tx.shareholding.findMany({ where: { id: { in: closedToZero } }, select: { identityId: true, shareClassId: true } })
+          : [];
+        for (const z of zeroRows) newHoldings.push({ ...scope, identityId: z.identityId, shareClassId: z.shareClassId, quantity: 0n, asOfDate, validFrom: now, importId });
         for (const part of chunks(closeHoldingIds)) await tx.shareholding.updateMany({ where: { id: { in: part }, validTo: null }, data: { validTo: now } });
         for (const part of chunks(newHoldings)) await tx.shareholding.createMany({ data: part });
         for (const [id, v] of nameUpdates) await tx.shareholder.update({ where: { id }, data: v });

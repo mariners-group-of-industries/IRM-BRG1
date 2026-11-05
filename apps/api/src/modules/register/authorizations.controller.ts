@@ -22,6 +22,7 @@ import { z } from 'zod';
 import {
   PERMISSIONS,
   corporateRepSchema,
+  meetingRulesSchema,
   normalizeBdPhone,
   proxySchema,
   type CorporateRepDto,
@@ -150,6 +151,14 @@ export class AuthorizationsController {
     return this.prisma.scoped([companyId], async (tx) => {
       const grantor = await tx.shareholder.findFirst({ where: { id: input.grantorShareholderId, companyId } });
       if (!grantor) throw new NotFoundException('Shareholder not found');
+      const meeting = await tx.meeting.findFirst({ where: { id: input.meetingId, companyId } });
+      if (!meeting) throw new NotFoundException('Meeting not found');
+      if (!['DRAFT', 'SCHEDULED', 'REGISTRATION_OPEN'].includes(meeting.state)) {
+        throw new BadRequestException('Proxies can only be lodged for a meeting that has not started');
+      }
+      if (!meetingRulesSchema.parse(meeting.rules).proxy.allowed) {
+        throw new BadRequestException('This meeting does not accept proxies');
+      }
       const documentId = doc ? (await tx.storedFile.create({ data: { tenantId: s.tenantId, companyId, kind: 'AUTHORIZATION_DOCUMENT', uploadedById: p.userId, ...doc } })).id : null;
       const proxy = await tx.proxyAuthorization.create({
         data: {
@@ -160,7 +169,8 @@ export class AuthorizationsController {
           email: input.email,
           phone: input.phone ? normalizeBdPhone(input.phone) : null,
           scope: input.scope,
-          meetingReference: input.meetingReference,
+          meetingId: meeting.id,
+          meetingReference: meeting.title.slice(0, 160),
           validFrom: new Date(`${input.validFrom}T00:00:00Z`),
           validUntil: new Date(`${input.validUntil}T00:00:00Z`),
           documentId,
@@ -306,6 +316,7 @@ export class AuthorizationsController {
       email: r.email,
       phone: r.phone,
       scope: r.scope,
+      meetingId: r.meetingId,
       meetingReference: r.meetingReference,
       validFrom: dateOnly(r.validFrom),
       validUntil: dateOnly(r.validUntil),

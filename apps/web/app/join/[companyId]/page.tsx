@@ -20,7 +20,7 @@ export default function JoinPage() {
   const company = useQuery({
     queryKey: ['public-company', companyId],
     queryFn: () => api.get<PublicCompanyInfo>(`/participant/companies/${companyId}`),
-    retry: false,
+    retry: (failureCount, error) => (error instanceof ApiError && error.status === 404 ? false : failureCount < 2),
   });
 
   return (

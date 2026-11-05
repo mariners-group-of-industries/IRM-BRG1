@@ -19,7 +19,7 @@ describe('role assignment and privilege boundaries', () => {
     meghna = await login(app, USERS.meghnaAdmin);
     meetingAdmin = await login(app, USERS.meetingAdmin);
     const items = (await platform.get('/companies?pageSize=100').expect(200)).body.items as { id: string; slug: string }[];
-    meghnaCementId = items.find((c) => c.slug === 'meghna-cement')!.id;
+    meghnaCementId = items.find((c) => c.slug === 'mariners-ventures')!.id;
     padmaId = items.find((c) => c.slug === 'padma-pharma')!.id;
   });
   afterAll(async () => {
@@ -37,17 +37,17 @@ describe('role assignment and privilege boundaries', () => {
   });
 
   it('company admin can grant a moderator role in their own company', async () => {
-    const id = await newUser(meghna, 'new.moderator@meghnacement.example');
+    const id = await newUser(meghna, 'new.moderator@marinersventures.example');
     await meghna.post('/assignments', { userId: id, roleKey: 'MODERATOR', scope: 'COMPANY', companyId: meghnaCementId }).expect(201);
   });
 
   it('company admin cannot grant roles in another tenant company', async () => {
-    const id = await newUser(meghna, 'cross.tenant@meghnacement.example');
+    const id = await newUser(meghna, 'cross.tenant@marinersventures.example');
     await meghna.post('/assignments', { userId: id, roleKey: 'MODERATOR', scope: 'COMPANY', companyId: padmaId }).expect(404);
   });
 
   it('company admin can grant meeting admin but not participant roles', async () => {
-    const id = await newUser(meghna, 'escalation@meghnacement.example');
+    const id = await newUser(meghna, 'escalation@marinersventures.example');
     await meghna.post('/assignments', { userId: id, roleKey: 'MEETING_ADMIN', scope: 'COMPANY', companyId: meghnaCementId }).expect(201);
     // Participant roles come only from verification and authorization flows.
     await meghna
@@ -61,7 +61,7 @@ describe('role assignment and privilege boundaries', () => {
   });
 
   it('only platform admins can grant platform roles', async () => {
-    const id = await newUser(meghna, 'wannabe.platform@meghnacement.example');
+    const id = await newUser(meghna, 'wannabe.platform@marinersventures.example');
     await meghna.post('/assignments', { userId: id, roleKey: 'PLATFORM_SUPER_ADMIN', scope: 'PLATFORM' }).expect(403);
   });
 
@@ -76,7 +76,7 @@ describe('role assignment and privilege boundaries', () => {
   });
 
   it('newly granted role takes effect on the next request', async () => {
-    const email = 'fresh.official@meghnacement.example';
+    const email = 'fresh.official@marinersventures.example';
     const id = await newUser(meghna, email);
     // Before assignment: no access.
     const before = await login(app, email, NEW_PASSWORD);
@@ -86,7 +86,7 @@ describe('role assignment and privilege boundaries', () => {
   });
 
   it('revoking a role removes access immediately', async () => {
-    const email = 'revoke.me@meghnacement.example';
+    const email = 'revoke.me@marinersventures.example';
     const id = await newUser(meghna, email);
     const a = await meghna.post('/assignments', { userId: id, roleKey: 'COMPANY_OFFICIAL', scope: 'COMPANY', companyId: meghnaCementId }).expect(201);
     const u = await login(app, email, NEW_PASSWORD);
@@ -96,7 +96,7 @@ describe('role assignment and privilege boundaries', () => {
   });
 
   it('duplicate active assignments are rejected by the database', async () => {
-    const id = await newUser(meghna, 'dupe.assign@meghnacement.example');
+    const id = await newUser(meghna, 'dupe.assign@marinersventures.example');
     const body = { userId: id, roleKey: 'COMPANY_OFFICIAL', scope: 'COMPANY', companyId: meghnaCementId };
     await meghna.post('/assignments', body).expect(201);
     await meghna.post('/assignments', body).expect(409);
@@ -107,7 +107,7 @@ describe('role assignment and privilege boundaries', () => {
     const items = res.body.items as { email: string; roles: { scopeName: string | null }[] }[];
     expect(items.some((u) => u.email === USERS.padmaAdmin)).toBe(false);
     expect(items.some((u) => u.email === USERS.platform)).toBe(false);
-    for (const u of items) for (const r of u.roles) expect(r.scopeName).toBe('Meghna Cement');
+    for (const u of items) for (const r of u.roles) expect(r.scopeName).toBe('Mariners Ventures');
   });
 
   it('disabling a user ends their sessions', async () => {
@@ -155,15 +155,15 @@ describe('adding a company member in one step', () => {
     const items = (await meghna.get('/companies').expect(200)).body.items as { id: string }[];
     const cement = items[0]!.id;
     const ok = await meghna
-      .post(`/companies/${cement}/members`, { email: 'one.step@meghnacement.example', fullName: 'One Step', password: 'Str0ng!Passphrase', roleKey: 'MODERATOR' })
+      .post(`/companies/${cement}/members`, { email: 'one.step@marinersventures.example', fullName: 'One Step', password: 'Str0ng!Passphrase', roleKey: 'MODERATOR' })
       .expect(201);
     expect(ok.body.assignmentId).toBeDefined();
 
     // A role the caller may not grant fails without creating the account.
     await meghna
-      .post(`/companies/${cement}/members`, { email: 'no.account@meghnacement.example', fullName: 'No Account', password: 'Str0ng!Passphrase', roleKey: 'SHAREHOLDER' })
+      .post(`/companies/${cement}/members`, { email: 'no.account@marinersventures.example', fullName: 'No Account', password: 'Str0ng!Passphrase', roleKey: 'SHAREHOLDER' })
       .expect(403);
     const prisma = app.get(PrismaService);
-    expect(await prisma.user.findUnique({ where: { email: 'no.account@meghnacement.example' } })).toBeNull();
+    expect(await prisma.user.findUnique({ where: { email: 'no.account@marinersventures.example' } })).toBeNull();
   });
 });

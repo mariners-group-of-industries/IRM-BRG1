@@ -32,7 +32,7 @@ async function latestCode(request: APIRequestContext, recipient: string): Promis
 
 test.describe('shareholder register', () => {
   test('company admin sees the register with full account numbers', async ({ browser }) => {
-    const cement = await companyId(browser, 'meghna-cement');
+    const cement = await companyId(browser, 'mariners-ventures');
     const ctx = await browser.newContext(as('meghnaAdmin'));
     const page = await ctx.newPage();
     await page.goto(`/companies/${cement}`);
@@ -51,7 +51,7 @@ test.describe('shareholder register', () => {
   });
 
   test('meeting admin sees masked account numbers', async ({ browser }) => {
-    const cement = await companyId(browser, 'meghna-cement');
+    const cement = await companyId(browser, 'mariners-ventures');
     const ctx = await browser.newContext(as('meetingAdmin'));
     const page = await ctx.newPage();
     await page.goto(`/companies/${cement}/shareholders`);
@@ -63,7 +63,7 @@ test.describe('shareholder register', () => {
   });
 
   test('imports a register through mapping, preview and commit', async ({ browser }) => {
-    const textiles = await companyId(browser, 'meghna-textiles');
+    const textiles = await companyId(browser, 'mariners-foods');
     const ctx = await browser.newContext(as('groupAdmin'));
     const page = await ctx.newPage();
     const run = Date.now().toString().slice(-6);
@@ -102,7 +102,7 @@ test.describe('shareholder register', () => {
   });
 
   test('representatives and proxies are listed with their status', async ({ browser }) => {
-    const cement = await companyId(browser, 'meghna-cement');
+    const cement = await companyId(browser, 'mariners-ventures');
     const ctx = await browser.newContext(as('meghnaAdmin'));
     const page = await ctx.newPage();
     await page.goto(`/companies/${cement}/authorizations`);
@@ -117,9 +117,9 @@ test.describe('shareholder register', () => {
 
 test.describe('participant sign-in', () => {
   test('a shareholder signs in with a one-time code and sees their holding', async ({ page, browser }) => {
-    const cement = await companyId(browser, 'meghna-cement');
+    const cement = await companyId(browser, 'mariners-ventures');
     await page.goto(`/join/${cement}`);
-    await expect(page.getByText('Meghna Cement Mills PLC')).toBeVisible();
+    await expect(page.getByText('Mariners Ventures PLC')).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await shot(page, 'b08-join');
 
@@ -136,7 +136,7 @@ test.describe('participant sign-in', () => {
     await outbox.close();
 
     await page.getByLabel(/6-digit code/).fill(code);
-    await page.getByRole('button', { name: 'Sign in to Meghna Cement' }).click();
+    await page.getByRole('button', { name: 'Sign in to Mariners Ventures' }).click();
     await expect(page).toHaveURL(/\/portal$/);
     await expect(page.getByRole('heading', { name: 'Welcome, Rokeya Begum' })).toBeVisible();
     await expect(page.getByText('8,500').first()).toBeVisible();
@@ -149,15 +149,17 @@ test.describe('participant sign-in', () => {
   });
 
   test('a proxy signs in by email and sees the grantor and scope @mobile', async ({ page, browser }) => {
-    const cement = await companyId(browser, 'meghna-cement');
+    const cement = await companyId(browser, 'mariners-ventures');
     await page.goto(`/join/${cement}`);
     await page.locator('label', { hasText: 'appointed as proxy' }).click();
     await page.getByLabel(/Email on your authorization/).fill('nasima.akter@example.com');
     await page.getByRole('button', { name: /Send me a code/ }).click();
+    await expect(page.getByRole('heading', { name: 'Enter your code' })).toBeVisible();
     await page.getByLabel(/6-digit code/).fill(await latestCode(page.request, 'nasima.akter@example.com'));
-    await page.getByRole('button', { name: 'Sign in to Meghna Cement' }).click();
-    await expect(page.getByText('Abdul Karim')).toBeVisible();
-    await expect(page.getByText('May attend and vote')).toBeVisible();
+    await page.getByRole('button', { name: 'Sign in to Mariners Ventures' }).click();
+    // The dev database can hold the same demo proxy in more than one company.
+    await expect(page.getByText('Abdul Karim').first()).toBeVisible();
+    await expect(page.getByText('May attend and vote').first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await shot(page, 'm04-portal-proxy');
   });

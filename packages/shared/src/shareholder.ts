@@ -150,8 +150,8 @@ export const proxySchema = z
     email: z.string().trim().toLowerCase().email('Enter a valid email').max(254),
     phone: optionalPhone,
     scope: z.enum(PROXY_SCOPES),
-    /** Free-text meeting reference until meetings exist (Phase C), then replaced by a meeting id. */
-    meetingReference: z.string().trim().min(2, 'Name the meeting this proxy is for').max(160),
+    /** The meeting this proxy is lodged for. Required since Phase C. */
+    meetingId: z.string().uuid('Select the meeting this proxy is for'),
     validFrom: dateOnly,
     validUntil: dateOnly,
   })

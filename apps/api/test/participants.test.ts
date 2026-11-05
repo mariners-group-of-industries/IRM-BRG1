@@ -28,7 +28,7 @@ describe('participant sign-in with one-time codes', () => {
     prisma = app.get(PrismaService);
     meghna = await login(app, USERS.meghnaAdmin);
     group = await login(app, USERS.groupAdmin);
-    cement = await companyId(meghna, 'meghna-cement');
+    cement = await companyId(meghna, 'mariners-ventures');
   });
   afterAll(async () => {
     await app.close();
@@ -36,7 +36,7 @@ describe('participant sign-in with one-time codes', () => {
 
   it('public company info is available for the sign-in page', async () => {
     const res = await request(server()).get(`/api/v1/participant/companies/${cement}`).expect(200);
-    expect(res.body).toEqual({ id: cement, legalName: 'Meghna Cement Mills PLC', shortName: 'Meghna Cement' });
+    expect(res.body).toEqual({ id: cement, legalName: 'Mariners Ventures PLC', shortName: 'Mariners Ventures' });
   });
 
   it('gives the same answer for unknown and known accounts', async () => {
@@ -63,7 +63,7 @@ describe('participant sign-in with one-time codes', () => {
     expect(profile.assignments.map((a: { roleKey: string }) => a.roleKey)).toEqual(['SHAREHOLDER']);
 
     const view = (await me.get('/participant/me').expect(200)).body;
-    expect(view[0].company.shortName).toBe('Meghna Cement');
+    expect(view[0].company.shortName).toBe('Mariners Ventures');
     expect(view[0].representations[0]).toMatchObject({ kind: 'SHAREHOLDER', shareholderName: 'Abdul Karim', totalShares: '15000' });
     expect(view[0].representations[0].identities[0].value).toBe('1201••••••••0001');
 
@@ -190,7 +190,7 @@ describe('participant sign-in with one-time codes', () => {
           fullName: 'Old Proxy',
           email: 'old.proxy@example.com',
           scope: 'ATTEND',
-          meetingReference: '35th AGM 2025',
+          meetingId: (await meghna.get(`/companies/${cement}/meetings`).expect(200)).body[0].id,
           validFrom: '2025-01-01',
           validUntil: '2025-12-31',
         })

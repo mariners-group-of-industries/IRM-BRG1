@@ -28,7 +28,7 @@ stateDiagram-v2
 | Live or Paused to Completed | Meeting Admin | Every voting session closed. Confirmation required. |
 | Completed to Archived | Company Admin | Minutes recorded. |
 
-The API holds the state machine in `meetings/meeting-state.ts` as a pure transition table with unit tests. Each transition is a single transaction: a conditional update on the expected current state, an insert into `meeting_state_transitions`, and an audit record. Any other request returns `409 Conflict`. Concurrent transitions therefore cannot both succeed.
+The transition table lives in `packages/shared/src/meeting.ts` and is shared with the web app. It has unit tests. The API enforces it in `MeetingsService.transition`. Each transition is a single transaction: a conditional update on the expected state and `version`, any side effects (the record-date snapshot when registration opens), an insert into `meeting_state_transitions`, and an audit record. Any other request returns `409 Conflict`. Concurrent transitions therefore cannot both succeed.
 
 ## 2. Agenda stage controls
 

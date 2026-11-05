@@ -53,11 +53,40 @@ Known limits:
 - **Approval needs two admins.** Four-eyes approval needs a second administrator with authorization rights. A company with a single admin cannot approve authorizations until a group admin or second admin is added.
 - **Register contacts.** Contacts imported from the register count as verified. Manual contact editing is not built yet.
 
-## Phase C: Meeting management (next)
+## Phase C: Meeting management (complete, 2026-11-05)
 
-Meetings, the state machine, agenda and resolutions, documents, rules configuration with schema validation, participant registration, the record-date snapshot, and the meeting control center.
+Delivered:
+- AGM and EGM meetings: virtual or hybrid, schedule in Dhaka time, record date and notice text.
+- A server-enforced state machine from Draft to Archived, with readiness checks, optimistic versioning, required reasons for withdrawal, and an immutable history.
+- An agenda with ordinary and special resolutions, proposer and seconder requirements, reordering, and locking once registration opens.
+- Governance rules (all configuration points in VOTING_RULES.md). They are validated, audited with before and after values, and locked once the meeting is live.
+- Meeting documents (PDF only), published to shareholders separately, plus board member and moderator assignment.
+- A record-date snapshot taken when registration opens. Voting entitlements are created from it, and both are immutable.
+- Participant registration by shareholders, corporate representatives and proxies, with eligibility explained.
+- Proxies are now linked to a real meeting. A proxy gives no rights at any other meeting.
+- A control center for staff, and meetings in the shareholder portal with Bangla labels.
 
-## Phase D: Live AGM experience
+| Acceptance criterion | Status | Evidence |
+|---|---|---|
+| Invalid transitions are rejected; concurrent changes cannot both win | Done | `meetings.test.ts`: off-graph transitions, stale `expectedVersion` |
+| Configuration and operation are separated | Done | Company Admin publishes and opens registration; only the Meeting Admin starts, pauses and ends |
+| Agenda and notice locked after registration; rules locked when live | Done | `meetings.test.ts` |
+| Snapshot uses holdings as of the record date and cannot change | Done | Totals checked against the seeded register; update and delete blocked by triggers; a record date before any register is refused |
+| Only eligible people register, for exactly what they hold or represent | Done | Shareholder and proxy registration; a proxy for another meeting has no options |
+| Participants see only published meetings and published documents | Done | `meetings.test.ts`, Playwright |
+
+Test totals: 26 shared unit tests, 86 API integration tests and 36 Playwright tests.
+
+Fixed during Phase C:
+- A full register import now writes a zero-share row when it closes a holding. Before this, a snapshot taken for a later record date could have reused the old balance.
+- A wrong one-time code no longer sends a shareholder to the staff sign-in page. The web client now treats a 401 from a sign-in step as a normal error.
+
+Known limits:
+- Starting a meeting changes its state only. The live meeting room, video and attendance arrive in Phase D.
+- Proxy lodgement deadlines and per-proxy limits are stored in the rules but not yet enforced. Enforcement comes with Phase D registration and attendance.
+- Shareholders are not sent notice emails or SMS, because no provider is configured. They see published meetings in the portal.
+
+## Phase D: Live AGM experience (next)
 
 The shareholder meeting room, the video provider adapter (Zoom, plus a labelled simulator), attendance, proposed, seconded and poll demand, text and audio questions, the moderator dashboard, the board view, and Socket.IO real-time.
 

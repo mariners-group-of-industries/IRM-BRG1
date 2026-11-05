@@ -1,5 +1,5 @@
 /**
- * Development-only demo register for Meghna Cement Mills PLC. Every name, account
+ * Development-only demo register for Mariners Ventures PLC. Every name, account
  * number, phone and email is fictitious. Runs once: skipped if the company already has shareholders.
  */
 import type { PrismaClient } from '../src/generated/prisma/client.js';
@@ -7,7 +7,7 @@ import type { PrismaClient } from '../src/generated/prisma/client.js';
 const D = (s: string) => new Date(`${s}T00:00:00Z`);
 
 export async function seedDemoRegister(prisma: PrismaClient): Promise<void> {
-  const company = await prisma.company.findFirst({ where: { slug: 'meghna-cement' } });
+  const company = await prisma.company.findFirst({ where: { slug: 'mariners-ventures' } });
   if (!company) return;
   if ((await prisma.shareholder.count({ where: { companyId: company.id } })) > 0) return;
   const scope = { tenantId: company.tenantId, companyId: company.id };
@@ -56,8 +56,8 @@ export async function seedDemoRegister(prisma: PrismaClient): Promise<void> {
     ids[h.name] = { shareholderId: s.id, identityIds };
   }
 
-  const creator = await prisma.user.findUniqueOrThrow({ where: { email: 'cs@meghnacement.example' } });
-  const approver = await prisma.user.findUniqueOrThrow({ where: { email: 'group.admin@meghna.example' } });
+  const creator = await prisma.user.findUniqueOrThrow({ where: { email: 'cs@marinersventures.example' } });
+  const approver = await prisma.user.findUniqueOrThrow({ where: { email: 'group.admin@mariners.example' } });
   const delta = ids['Delta Life Investments Limited']!;
   await prisma.corporateRepresentative.create({
     data: {
@@ -91,5 +91,5 @@ export async function seedDemoRegister(prisma: PrismaClient): Promise<void> {
       decidedAt: new Date(),
     },
   });
-  console.log(`[seed] Demo register for Meghna Cement: ${holders.length} shareholders, 1 corporate representative, 1 proxy`);
+  console.log(`[seed] Demo register for Mariners Ventures: ${holders.length} shareholders, 1 corporate representative, 1 proxy`);
 }

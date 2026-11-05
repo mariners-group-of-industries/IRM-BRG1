@@ -6,3 +6,5 @@ export * from './schemas.js';
 export * from './api-types.js';
 export * from './shareholder.js';
 export * from './shareholder-types.js';
+export * from './meeting.js';
+export * from './meeting-types.js';

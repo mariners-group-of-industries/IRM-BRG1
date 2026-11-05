@@ -7,8 +7,8 @@ Source of truth: `packages/shared/src/permissions.ts` and `roles.ts`. The seed s
 | Scope | Applies to | Example |
 |---|---|---|
 | PLATFORM | Everything, but only with platform permissions | Platform operator |
-| TENANT | The tenant and every company in it | Group company secretary for all Meghna companies |
-| COMPANY | One company | Company secretary of Meghna Cement |
+| TENANT | The tenant and every company in it | Group company secretary for all Mariners companies |
+| COMPANY | One company | Company secretary of Mariners Ventures |
 
 A check passes when **any** active assignment both holds the permission and covers the resource. The resource's tenant is always resolved from the database.
 

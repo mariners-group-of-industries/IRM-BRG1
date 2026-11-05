@@ -6,11 +6,12 @@ export const PASSWORD = process.env.SEED_DEFAULT_PASSWORD ?? 'Agm!Dev2026';
 
 export const USERS = {
   platform: 'platform.admin@irm.local',
-  groupAdmin: 'group.admin@meghna.example',
-  meghnaAdmin: 'cs@meghnacement.example',
-  meetingAdmin: 'meeting.admin@meghnacement.example',
-  moderator: 'moderator@meghnacement.example',
-  director: 'director@meghnacement.example',
+  groupAdmin: 'group.admin@mariners.example',
+  meghnaAdmin: 'cs@marinersventures.example',
+  marinersAdmin: 'cs@marinersventures.example',
+  meetingAdmin: 'meeting.admin@marinersventures.example',
+  moderator: 'moderator@marinersventures.example',
+  director: 'director@marinersventures.example',
   padmaAdmin: 'cs@padmapharma.example',
 } as const;
 
@@ -24,6 +25,7 @@ export interface Client {
   get: (path: string) => request.Test;
   post: (path: string, body?: object) => request.Test;
   patch: (path: string, body?: object) => request.Test;
+  put: (path: string, body?: object) => request.Test;
   delete: (path: string) => request.Test;
   upload: (path: string, field: string, data: Buffer, filename: string, fields?: Record<string, string | string[]>) => request.Test;
   csrf: string;
@@ -43,6 +45,7 @@ export function clientFor(app: INestApplication, cookie: string, csrf: string): 
     get: (p) => request(server).get(url(p)).set('Cookie', cookie),
     post: (p, b) => request(server).post(url(p)).set('Cookie', cookie).set('X-CSRF-Token', csrf).send(b ?? {}),
     patch: (p, b) => request(server).patch(url(p)).set('Cookie', cookie).set('X-CSRF-Token', csrf).send(b ?? {}),
+    put: (p, b) => request(server).put(url(p)).set('Cookie', cookie).set('X-CSRF-Token', csrf).send(b ?? {}),
     delete: (p) => request(server).delete(url(p)).set('Cookie', cookie).set('X-CSRF-Token', csrf),
     upload: (p, field, data, filename, fields = {}) => {
       let r = request(server).post(url(p)).set('Cookie', cookie).set('X-CSRF-Token', csrf);

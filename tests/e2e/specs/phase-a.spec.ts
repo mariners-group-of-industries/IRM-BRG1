@@ -55,12 +55,12 @@ test.describe('platform administrator', () => {
     await page.goto('/dashboard');
     await nav(page).getByRole('link', { name: 'Tenants' }).click();
     await expect(page).toHaveURL(/\/tenants$/);
-    await expect(page.getByText('meghna-group', { exact: true })).toBeVisible();
+    await expect(page.getByText('mariners-group', { exact: true })).toBeVisible();
     await expect(page.getByText('padma-industries', { exact: true })).toBeVisible();
     await shot(page, '04-tenants');
     await nav(page).getByRole('link', { name: 'Companies' }).click();
     await expect(page).toHaveURL(/\/companies$/);
-    await expect(page.getByRole('link', { name: 'Meghna Cement Mills PLC' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Mariners Ventures PLC' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Padma Pharmaceuticals PLC' })).toBeVisible();
     await shot(page, '05-companies');
   });
@@ -108,13 +108,13 @@ test.describe('company admin isolation', () => {
     await expect(nav(page).getByRole('link', { name: 'Tenants' })).toHaveCount(0);
     await nav(page).getByRole('link', { name: 'Companies' }).click();
     await expect(page.getByRole('link', { name: 'Padma Pharmaceuticals PLC' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Meghna Cement Mills PLC' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Mariners Ventures PLC' })).toHaveCount(0);
     await shot(page, '10-companies-company-admin');
   });
 
   test('direct link to another tenant company shows not found', async ({ page, browser }) => {
     const platform = await browser.newContext(as('platform'));
-    const res = await platform.request.get('/api/v1/companies?q=Meghna%20Cement');
+    const res = await platform.request.get('/api/v1/companies?q=Mariners%20Ventures');
     const id = (await res.json()).items[0].id as string;
     await platform.close();
 
@@ -140,9 +140,9 @@ test.describe('other roles', () => {
     const ctx = await browser.newContext(as('meghnaAdmin'));
     const page = await ctx.newPage();
     await page.goto('/companies');
-    await page.getByRole('link', { name: 'Meghna Cement Mills PLC' }).click();
+    await page.getByRole('link', { name: 'Mariners Ventures PLC' }).click();
     await expect(page.getByRole('heading', { name: 'Members' })).toBeVisible();
-    await expect(page.getByText('meeting.admin@meghnacement.example')).toBeVisible();
+    await expect(page.getByText('meeting.admin@marinersventures.example')).toBeVisible();
     await page.getByRole('button', { name: 'Add member' }).click();
     const role = page.getByRole('dialog').getByLabel('Role');
     await expect(role.locator('option')).toHaveText(['Company Admin', 'Meeting Admin', 'Board Member', 'Moderator', 'Company Official']);
@@ -173,7 +173,7 @@ test.describe('responsive layout @mobile', () => {
       await page.getByRole('button', { name: 'Open navigation' }).click();
       await page.getByRole('dialog').getByRole('link', { name: 'Companies' }).click();
       await expect(page).toHaveURL(/\/companies$/);
-      await expect(page.getByRole('link', { name: 'Meghna Cement Mills PLC' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Mariners Ventures PLC' })).toBeVisible();
       await expectNoHorizontalOverflow(page);
       await shot(page, 'm03-companies');
     });

@@ -75,6 +75,20 @@ const AUDIT_LABELS: Record<string, string> = {
   'auth.mfa_enabled': 'Two-step verification on',
   'auth.mfa_disabled': 'Two-step verification off',
   'auth.mfa_disable': 'Two-step disable failed',
+  'meeting.create': 'Meeting created',
+  'meeting.update': 'Meeting details changed',
+  'meeting.rules_update': 'Governance rules changed',
+  'meeting.transition': 'Meeting status changed',
+  'meeting.staff_update': 'Meeting staff changed',
+  'meeting.register': 'Participant registered',
+  'agenda.create': 'Agenda item added',
+  'agenda.update': 'Agenda item edited',
+  'agenda.delete': 'Agenda item removed',
+  'agenda.reorder': 'Agenda reordered',
+  'meeting_document.upload': 'Meeting document uploaded',
+  'meeting_document.publish': 'Meeting document published',
+  'meeting_document.unpublish': 'Meeting document unpublished',
+  'meeting_document.remove': 'Meeting document removed',
 };
 export const auditLabel = (a: string) => AUDIT_LABELS[a] ?? a;
 
@@ -101,4 +115,13 @@ export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** <input type="datetime-local"> value in Dhaka time to an ISO string with offset. */
+export const dhakaLocalToIso = (local: string) => (local ? `${local}:00+06:00` : '');
+
+/** ISO string to a <input type="datetime-local"> value in Dhaka time. */
+export function isoToDhakaLocal(iso: string): string {
+  const d = new Date(new Date(iso).getTime() + 6 * 3600_000);
+  return d.toISOString().slice(0, 16);
 }

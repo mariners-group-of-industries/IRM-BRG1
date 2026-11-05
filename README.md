@@ -7,8 +7,9 @@ This repository is a modular monolith in a pnpm monorepo.
 | Status | |
 |---|---|
 | Phase A, foundation | **Complete.** |
-| Phase B, shareholder system | **Complete.** See [docs/ROADMAP.md](docs/ROADMAP.md) |
-| Phase C, meeting management | Next |
+| Phase B, shareholder system | **Complete.** |
+| Phase C, meeting management | **Complete.** See [docs/ROADMAP.md](docs/ROADMAP.md) |
+| Phase D, live AGM experience | Next |
 
 ## What works today
 
@@ -17,7 +18,9 @@ This repository is a modular monolith in a pnpm monorepo.
 - Nine roles and 37 permissions from one shared catalogue, plus role assignment that blocks privilege escalation.
 - The shareholder register: BO and folio accounts, versioned holdings and masked personal data.
 - Register imports from CSV or Excel, with column mapping, row-by-row preview and confirmed commit.
-- Corporate representatives and proxies, which need approval by a second administrator.
+- Corporate representatives and proxies, which need approval by a second administrator. Proxies are tied to one meeting.
+- AGM and EGM management: notice, agenda and resolutions, PDF documents, governance rules, staff, a guarded state machine with a control center, and a record-date snapshot of voting entitlements.
+- Shareholders see published meetings in the portal, read the notice and documents, and register for what they hold or represent.
 - Shareholder, representative and proxy sign-in with one-time codes, plus a participant portal with Bangla labels.
 - An append-only audit log, enforced by a PostgreSQL trigger.
 
@@ -80,16 +83,16 @@ The seed creates fictitious companies and these staff accounts. They are for dev
 | Email | Role | Scope |
 |---|---|---|
 | platform.admin@irm.local | Platform Super Admin | Platform |
-| group.admin@meghna.example | Company Admin | Meghna Holdings Group, every company |
-| cs@meghnacement.example | Company Admin | Meghna Cement Mills PLC |
-| meeting.admin@meghnacement.example | Meeting Admin | Meghna Cement Mills PLC |
-| moderator@meghnacement.example | Moderator | Meghna Cement Mills PLC |
-| director@meghnacement.example | Board Member | Meghna Cement Mills PLC |
+| group.admin@mariners.example | Company Admin | Mariners Group, every company |
+| cs@marinersventures.example | Company Admin | Mariners Ventures PLC |
+| meeting.admin@marinersventures.example | Meeting Admin | Mariners Ventures PLC |
+| moderator@marinersventures.example | Moderator | Mariners Ventures PLC |
+| director@marinersventures.example | Board Member | Mariners Ventures PLC |
 | cs@padmapharma.example | Company Admin | Padma Pharmaceuticals PLC |
 
 ### Try the shareholder sign-in
 
-Meghna Cement Mills PLC has a small fictitious register. Find its company id on the Companies page or in the URL, then open:
+Mariners Ventures PLC has a small fictitious register. Find its company id on the Companies page or in the URL, then open:
 
 ```
 http://localhost:3100/join/<company-id>

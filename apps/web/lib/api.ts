@@ -34,7 +34,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     cache: 'no-store',
   });
 
-  if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/login')) {
+  // A 401 from a sign-in step means wrong credentials or code, not an expired session:
+  // the caller shows the error instead of being sent to the staff sign-in page.
+  const signInStep = ['/auth/login', '/auth/mfa/verify', '/participant/otp/'].some((p) => path.startsWith(p));
+  if (res.status === 401 && typeof window !== 'undefined' && !signInStep) {
     const next = encodeURIComponent(window.location.pathname + window.location.search);
     // A full page load is intended here: it drops all cached query data from the expired session.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
@@ -55,6 +58,7 @@ export const api = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
+  put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
   /** Multipart upload. The browser sets the boundary header. */
   upload: <T>(path: string, form: FormData) => request<T>('POST', path, form),

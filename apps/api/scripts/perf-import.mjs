@@ -4,12 +4,12 @@
 const BASE = process.env.API_URL ?? 'http://127.0.0.1:4000/api/v1';
 const ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:3100';
 const rows = Number(process.argv[2] ?? 50000);
-const slug = process.argv[3] ?? 'meghna-logistics';
+const slug = process.argv[3] ?? 'mariners-agro';
 
 const login = await fetch(`${BASE}/auth/login`, {
   method: 'POST',
   headers: { 'content-type': 'application/json', origin: ORIGIN },
-  body: JSON.stringify({ email: 'group.admin@meghna.example', password: process.env.SEED_DEFAULT_PASSWORD ?? 'Agm!Dev2026' }),
+  body: JSON.stringify({ email: 'group.admin@mariners.example', password: process.env.SEED_DEFAULT_PASSWORD ?? 'Agm!Dev2026' }),
 });
 if (!login.ok) throw new Error(`login failed ${login.status}`);
 const cookie = login.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');

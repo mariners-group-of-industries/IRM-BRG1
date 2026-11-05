@@ -4,10 +4,10 @@ export const PASSWORD = process.env.SEED_DEFAULT_PASSWORD ?? 'Agm!Dev2026';
 
 export const USERS = {
   platform: 'platform.admin@irm.local',
-  groupAdmin: 'group.admin@meghna.example',
-  meghnaAdmin: 'cs@meghnacement.example',
-  moderator: 'moderator@meghnacement.example',
-  meetingAdmin: 'meeting.admin@meghnacement.example',
+  groupAdmin: 'group.admin@mariners.example',
+  meghnaAdmin: 'cs@marinersventures.example',
+  moderator: 'moderator@marinersventures.example',
+  meetingAdmin: 'meeting.admin@marinersventures.example',
   padmaAdmin: 'cs@padmapharma.example',
 } as const;
 

@@ -95,4 +95,42 @@ Every company-scoped path is `/companies/:companyId/...`.
 | GET | `/participant/me` | participant session | What the person represents, per company |
 | GET | `/dev/outbox` | public, development only | Returns 404 in production |
 
-Request and response TypeScript types are in `packages/shared/src/api-types.ts` and `shareholder-types.ts`.
+## Endpoints (Phase C)
+
+### Meetings (staff)
+
+All paths are under `/companies/:companyId/meetings`.
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET / POST | `/` | `meeting.read` / `meeting.create` | POST `{ type, title, scheduledStart (ISO with offset), recordDate, mode, venue? }` |
+| GET / PATCH | `/:id` | `meeting.read` / `meeting.update` | Editable in Draft and Scheduled only |
+| PUT | `/:id/rules` | `meeting.update` | The full rules object (see `meetingRulesSchema`). Locked once live. |
+| GET | `/:id/control` | `meeting.read` | Next transitions with readiness checks, and history |
+| POST | `/:id/transition` | per the transition table | `{ to, expectedVersion, reason? }`. Returns 409 if not ready, not allowed by the state machine, or stale. |
+| GET / POST | `/:id/agenda` | read / `agenda.manage` | `{ number, title, description?, hasResolution, resolutionKind, resolutionText, requiresProposal, requiresSeconding }` |
+| PATCH / DELETE | `/:id/agenda/:itemId` | `agenda.manage` | |
+| POST | `/:id/agenda/order` | `agenda.manage` | `{ ids }`, every item exactly once |
+| GET / POST | `/:id/documents` | read / `document.manage` | Multipart `file` (PDF only, up to 25 MB), `kind`, `title`, `agendaItemId?` |
+| PATCH | `/:id/documents/:docId` | `document.manage` | `{ published }` or `{ removed: true }` |
+| GET | `/:id/documents/:docId/download` | `meeting.read` | |
+| GET / PUT | `/:id/staff` | read / `meeting.update` | `{ boardMemberIds, moderatorIds }`. Each person must hold that role in the company. |
+| GET | `/:id/snapshot`, `/:id/entitlements?q=&page=` | `shareholder.read` | Accounts are masked without `shareholder.pii.read` |
+| GET | `/:id/participants` | `attendance.read` | Registrations with votes |
+
+| Transition | Permission |
+|---|---|
+| Draft → Scheduled, Scheduled → Draft (reason required), Completed → Archived | `meeting.update` |
+| Scheduled → Registration Open | `meeting.update` or `meeting.control` |
+| Registration Open → Live, Live ↔ Paused, Live or Paused → Completed | `meeting.control` |
+
+### Meetings (participants)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/participant/meetings` | Published meetings of the companies the person is linked to |
+| GET | `/participant/meetings/:id` | Notice, agenda, published documents and eligibility per capacity |
+| POST | `/participant/meetings/:id/register` | `{ key }` from `eligibility`. Idempotent. |
+| GET | `/participant/meetings/:id/documents/:docId` | Published documents only |
+
+Request and response TypeScript types are in `packages/shared/src/api-types.ts`, `shareholder-types.ts` and `meeting-types.ts`.

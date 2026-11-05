@@ -28,37 +28,37 @@ describe('tenant and company isolation', () => {
 
   it('platform admin sees every company', () => {
     expect(Object.keys(companies).sort()).toEqual(
-      ['meghna-cement', 'meghna-logistics', 'meghna-textiles', 'padma-pharma'].sort(),
+      ['mariners-agro', 'mariners-foods', 'mariners-ventures', 'padma-pharma'].sort(),
     );
   });
 
   it('tenant-scoped admin sees only companies in their group', async () => {
     const slugs = ((await group.get('/companies').expect(200)).body.items as CompanyRow[]).map((c) => c.slug);
-    expect(slugs.sort()).toEqual(['meghna-cement', 'meghna-logistics', 'meghna-textiles']);
+    expect(slugs.sort()).toEqual(['mariners-agro', 'mariners-foods', 'mariners-ventures']);
   });
 
   it('company admin sees only their own company', async () => {
     const slugs = ((await meghna.get('/companies').expect(200)).body.items as CompanyRow[]).map((c) => c.slug);
-    expect(slugs).toEqual(['meghna-cement']);
+    expect(slugs).toEqual(['mariners-ventures']);
   });
 
   it('returns 404, not 403, for a company in another tenant', async () => {
-    await padma.get(`/companies/${companies['meghna-cement']!.id}`).expect(404);
+    await padma.get(`/companies/${companies['mariners-ventures']!.id}`).expect(404);
     await meghna.get(`/companies/${companies['padma-pharma']!.id}`).expect(404);
   });
 
   it('company admin cannot read a sibling company in the same tenant', async () => {
-    await meghna.get(`/companies/${companies['meghna-textiles']!.id}`).expect(404);
+    await meghna.get(`/companies/${companies['mariners-foods']!.id}`).expect(404);
   });
 
   it('company admin cannot update another tenant company', async () => {
-    await padma.patch(`/companies/${companies['meghna-cement']!.id}`, { shortName: 'Hijacked' }).expect(404);
+    await padma.patch(`/companies/${companies['mariners-ventures']!.id}`, { shortName: 'Hijacked' }).expect(404);
   });
 
   it('company admin cannot create companies or tenants', async () => {
     await meghna
       .post('/companies', {
-        tenantId: companies['meghna-cement']!.tenantId,
+        tenantId: companies['mariners-ventures']!.tenantId,
         legalName: 'Rogue Co Limited',
         shortName: 'Rogue',
         slug: 'rogue-co',
@@ -69,7 +69,7 @@ describe('tenant and company isolation', () => {
   });
 
   it('company admin cannot suspend their own company', async () => {
-    await meghna.patch(`/companies/${companies['meghna-cement']!.id}`, { status: 'SUSPENDED' }).expect(403);
+    await meghna.patch(`/companies/${companies['mariners-ventures']!.id}`, { status: 'SUSPENDED' }).expect(403);
   });
 
   it('tenant list is limited to the caller tenants', async () => {
@@ -117,10 +117,10 @@ describe('tenant and company isolation', () => {
   it('rejects duplicate company slugs inside a tenant', async () => {
     await platform
       .post('/companies', {
-        tenantId: companies['meghna-cement']!.tenantId,
+        tenantId: companies['mariners-ventures']!.tenantId,
         legalName: 'Duplicate',
         shortName: 'Dup',
-        slug: 'meghna-cement',
+        slug: 'mariners-ventures',
         companyType: 'PRIVATE',
       })
       .expect(409);

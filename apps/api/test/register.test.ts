@@ -30,8 +30,8 @@ describe('shareholder register import', () => {
     group = await login(app, USERS.groupAdmin);
     meetingAdmin = await login(app, USERS.meetingAdmin);
     padma = await login(app, USERS.padmaAdmin);
-    textiles = await companyId(group, 'meghna-textiles');
-    cement = await companyId(group, 'meghna-cement');
+    textiles = await companyId(group, 'mariners-foods');
+    cement = await companyId(group, 'mariners-ventures');
   });
   afterAll(async () => {
     await app.close();

@@ -24,6 +24,9 @@ import { ImportsController } from './modules/register/imports.controller.js';
 import { ImportsService } from './modules/register/imports.service.js';
 import { ShareholdersController } from './modules/register/shareholders.controller.js';
 import { StorageService } from './modules/storage/storage.service.js';
+import { MeetingsController } from './modules/meetings/meetings.controller.js';
+import { MeetingsService } from './modules/meetings/meetings.service.js';
+import { PortalMeetingsController } from './modules/participants/portal-meetings.controller.js';
 
 /**
  * Modular monolith root. Phase A wires the platform core. Later phases add
@@ -48,6 +51,8 @@ import { StorageService } from './modules/storage/storage.service.js';
     ImportsController,
     AuthorizationsController,
     ParticipantAuthController,
+    MeetingsController,
+    PortalMeetingsController,
   ],
   providers: [
     AuditService,
@@ -60,6 +65,7 @@ import { StorageService } from './modules/storage/storage.service.js';
     NotificationService,
     ImportsService,
     ParticipantAccessService,
+    MeetingsService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

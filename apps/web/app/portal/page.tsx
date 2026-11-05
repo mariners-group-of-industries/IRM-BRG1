@@ -3,12 +3,13 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, LogOut } from 'lucide-react';
-import type { ParticipantMe, ParticipantRepresentation } from '@irm/shared';
+import Link from 'next/link';
+import { CalendarClock, ChevronRight, LogOut } from 'lucide-react';
+import type { ParticipantMe, ParticipantRepresentation, PortalMeeting } from '@irm/shared';
 import { Alert, Badge, Button, Panel, Skeleton } from '@irm/ui';
 import { BrandMark } from '@/components/brand';
 import { api, setCsrfToken } from '@/lib/api';
-import { formatDate, formatShares } from '@/lib/format';
+import { formatDate, formatDateTime, formatShares } from '@/lib/format';
 import { useMe } from '@/lib/session';
 
 /** Home for shareholders, corporate representatives and proxies. */
@@ -61,15 +62,7 @@ export default function PortalPage() {
             <h1 className="text-xl font-semibold tracking-tight text-ink">Welcome, {me.data?.user.fullName}</h1>
             <p className="mt-1 text-ink-3">স্বাগতম। আপনার শেয়ারধারণ ও সভার তথ্য এখানে দেখুন।</p>
 
-            <Panel className="mt-6">
-              <div className="flex items-start gap-3 px-5 py-4">
-                <CalendarClock className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-                <div>
-                  <p className="font-medium text-ink">Meetings</p>
-                  <p className="text-sm text-ink-3">No meeting is open for registration yet. When the company publishes an AGM or EGM notice, it will appear here.</p>
-                </div>
-              </div>
-            </Panel>
+            <Meetings />
 
             {data.data.map((m) => (
               <section key={m.company.id} className="mt-8">
@@ -123,5 +116,54 @@ function Representation({ r }: { r: ParticipantRepresentation }) {
         ))}
       </ul>
     </Panel>
+  );
+}
+
+function Meetings() {
+  const q = useQuery({ queryKey: ['portal-meetings'], queryFn: () => api.get<PortalMeeting[]>('/participant/meetings') });
+  return (
+    <section className="mt-6" aria-labelledby="meetings-heading">
+      <h2 id="meetings-heading" className="mb-3 text-sm font-medium text-ink-3">Meetings · সভা</h2>
+      {q.isPending ? (
+        <Skeleton className="h-20" />
+      ) : q.isError ? (
+        <Alert tone="danger">{q.error.message}</Alert>
+      ) : q.data.length === 0 ? (
+        <Panel>
+          <div className="flex items-start gap-3 px-5 py-4">
+            <CalendarClock className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+            <p className="text-sm text-ink-3">No meeting has been announced yet. When the company publishes an AGM or EGM notice, it will appear here.</p>
+          </div>
+        </Panel>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {q.data.map((m) => {
+            const registered = m.eligibility.some((e) => e.registered);
+            return (
+              <li key={m.id}>
+                <Link
+                  href={`/portal/meetings/${m.id}`}
+                  className="flex items-center gap-4 rounded-lg border border-line bg-surface px-5 py-4 transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
+                >
+                  <CalendarClock className="size-5 shrink-0 text-accent" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-ink">{m.title}</p>
+                    <p className="text-sm text-ink-3 tabular">{formatDateTime(m.scheduledStart)} · {m.companyName}</p>
+                  </div>
+                  {registered ? (
+                    <Badge tone="success" dot>Registered</Badge>
+                  ) : m.registrationOpen ? (
+                    <Badge tone="accent" dot>Registration open</Badge>
+                  ) : (
+                    <Badge tone="info">Notice published</Badge>
+                  )}
+                  <ChevronRight className="size-4 shrink-0 text-ink-4" aria-hidden />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

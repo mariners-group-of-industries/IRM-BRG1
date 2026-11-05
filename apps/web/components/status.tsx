@@ -48,3 +48,30 @@ export function AuthorizationStatusBadge({ status, effective }: { status: string
   if (status === 'REJECTED') return <Badge tone="danger">Rejected</Badge>;
   return <Badge tone="neutral">Revoked</Badge>;
 }
+
+const MEETING_TONES: Record<string, 'neutral' | 'info' | 'accent' | 'success' | 'warning' | 'danger'> = {
+  DRAFT: 'neutral',
+  SCHEDULED: 'info',
+  REGISTRATION_OPEN: 'accent',
+  LIVE: 'success',
+  PAUSED: 'warning',
+  COMPLETED: 'neutral',
+  ARCHIVED: 'neutral',
+};
+const MEETING_LABELS: Record<string, string> = {
+  DRAFT: 'Draft',
+  SCHEDULED: 'Scheduled',
+  REGISTRATION_OPEN: 'Registration open',
+  LIVE: 'Live',
+  PAUSED: 'Paused',
+  COMPLETED: 'Completed',
+  ARCHIVED: 'Archived',
+};
+
+export function MeetingStateBadge({ state }: { state: string }) {
+  return (
+    <Badge tone={MEETING_TONES[state] ?? 'neutral'} dot={state !== 'COMPLETED' && state !== 'ARCHIVED'}>
+      {MEETING_LABELS[state] ?? state}
+    </Badge>
+  );
+}

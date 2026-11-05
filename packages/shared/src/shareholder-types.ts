@@ -130,6 +130,7 @@ export interface ProxyDto {
   email: string;
   phone: string | null;
   scope: ProxyScope;
+  meetingId: string | null;
   meetingReference: string;
   validFrom: string;
   validUntil: string;

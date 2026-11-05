@@ -12,6 +12,7 @@ import argon2 from 'argon2';
 import { ALL_PERMISSIONS, PERMISSION_DESCRIPTIONS, ROLE_DEFINITIONS } from '@irm/shared';
 import { PrismaClient, type RoleScope } from '../src/generated/prisma/client.js';
 import { seedDemoRegister } from './seed-register.js';
+import { seedDemoMeeting } from './seed-meeting.js';
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 
@@ -58,9 +59,9 @@ async function seedDemo(): Promise<void> {
   const hash = await argon2.hash(password, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
 
   const tenantA = await prisma.tenant.upsert({
-    where: { slug: 'meghna-group' },
-    create: { name: 'Meghna Holdings Group', slug: 'meghna-group' },
-    update: {},
+    where: { slug: 'mariners-group' },
+    create: { name: 'Mariners Group', slug: 'mariners-group' },
+    update: { name: 'Mariners Group' },
   });
   const tenantB = await prisma.tenant.upsert({
     where: { slug: 'padma-industries' },
@@ -69,9 +70,9 @@ async function seedDemo(): Promise<void> {
   });
 
   const companies = [
-    { tenantId: tenantA.id, slug: 'meghna-cement', legalName: 'Meghna Cement Mills PLC', shortName: 'Meghna Cement', companyType: 'PUBLIC_LISTED', tradingCode: 'MGCEM', registrationNumber: 'C-104522' },
-    { tenantId: tenantA.id, slug: 'meghna-textiles', legalName: 'Meghna Textiles Limited', shortName: 'Meghna Textiles', companyType: 'PUBLIC_UNLISTED', tradingCode: null, registrationNumber: 'C-118790' },
-    { tenantId: tenantA.id, slug: 'meghna-logistics', legalName: 'Meghna Logistics Private Limited', shortName: 'Meghna Logistics', companyType: 'PRIVATE', tradingCode: null, registrationNumber: 'C-131204' },
+    { tenantId: tenantA.id, slug: 'mariners-ventures', legalName: 'Mariners Ventures PLC', shortName: 'Mariners Ventures', companyType: 'PUBLIC_LISTED', tradingCode: 'MARINER', registrationNumber: 'C-104522' },
+    { tenantId: tenantA.id, slug: 'mariners-foods', legalName: 'Mariners Foods & Beverages Limited', shortName: 'Mariners Foods', companyType: 'PUBLIC_UNLISTED', tradingCode: null, registrationNumber: 'C-118790' },
+    { tenantId: tenantA.id, slug: 'mariners-agro', legalName: 'Mariners Agro Industries Private Limited', shortName: 'Mariners Agro', companyType: 'PRIVATE', tradingCode: null, registrationNumber: 'C-131204' },
     { tenantId: tenantB.id, slug: 'padma-pharma', legalName: 'Padma Pharmaceuticals PLC', shortName: 'Padma Pharma', companyType: 'PUBLIC_LISTED', tradingCode: 'PADPHR', registrationNumber: 'C-099311' },
   ] as const;
 
@@ -79,8 +80,8 @@ async function seedDemo(): Promise<void> {
   for (const c of companies) {
     const row = await prisma.company.upsert({
       where: { tenantId_slug: { tenantId: c.tenantId, slug: c.slug } },
-      create: { ...c, registeredAddress: 'Motijheel C/A, Dhaka 1000', contactEmail: `company.secretary@${c.slug}.example` },
-      update: {},
+      create: { ...c, registeredAddress: 'MG SAM Center, 12 Mohakhali C/A, Dhaka-1212', contactEmail: `company.secretary@${c.slug}.example` },
+      update: { legalName: c.legalName, shortName: c.shortName },
     });
     companyIds[c.slug] = { id: row.id, tenantId: row.tenantId };
   }
@@ -88,11 +89,11 @@ async function seedDemo(): Promise<void> {
   const roles = new Map((await prisma.role.findMany()).map((r) => [r.key, r.id]));
   const users: { email: string; fullName: string; roleKey: string; scope: RoleScope; tenantId?: string; company?: string }[] = [
     { email: 'platform.admin@irm.local', fullName: 'Nusrat Jahan', roleKey: 'PLATFORM_SUPER_ADMIN', scope: 'PLATFORM' },
-    { email: 'group.admin@meghna.example', fullName: 'Tanvir Ahmed', roleKey: 'COMPANY_ADMIN', scope: 'TENANT', tenantId: tenantA.id },
-    { email: 'cs@meghnacement.example', fullName: 'Farhana Rahman', roleKey: 'COMPANY_ADMIN', scope: 'COMPANY', company: 'meghna-cement' },
-    { email: 'meeting.admin@meghnacement.example', fullName: 'Rafiqul Islam', roleKey: 'MEETING_ADMIN', scope: 'COMPANY', company: 'meghna-cement' },
-    { email: 'moderator@meghnacement.example', fullName: 'Sadia Karim', roleKey: 'MODERATOR', scope: 'COMPANY', company: 'meghna-cement' },
-    { email: 'director@meghnacement.example', fullName: 'Mahmudul Hasan', roleKey: 'BOARD_MEMBER', scope: 'COMPANY', company: 'meghna-cement' },
+    { email: 'group.admin@mariners.example', fullName: 'Tanvir Ahmed', roleKey: 'COMPANY_ADMIN', scope: 'TENANT', tenantId: tenantA.id },
+    { email: 'cs@marinersventures.example', fullName: 'Farhana Rahman', roleKey: 'COMPANY_ADMIN', scope: 'COMPANY', company: 'mariners-ventures' },
+    { email: 'meeting.admin@marinersventures.example', fullName: 'Rafiqul Islam', roleKey: 'MEETING_ADMIN', scope: 'COMPANY', company: 'mariners-ventures' },
+    { email: 'moderator@marinersventures.example', fullName: 'Sadia Karim', roleKey: 'MODERATOR', scope: 'COMPANY', company: 'mariners-ventures' },
+    { email: 'director@marinersventures.example', fullName: 'Mahmudul Hasan', roleKey: 'BOARD_MEMBER', scope: 'COMPANY', company: 'mariners-ventures' },
     { email: 'cs@padmapharma.example', fullName: 'Shirin Akter', roleKey: 'COMPANY_ADMIN', scope: 'COMPANY', company: 'padma-pharma' },
   ];
 
@@ -122,6 +123,7 @@ async function main(): Promise<void> {
   if (process.env.NODE_ENV !== 'production') {
     await seedDemo();
     await seedDemoRegister(prisma);
+    await seedDemoMeeting(prisma);
   }
 }
 

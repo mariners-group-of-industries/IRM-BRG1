@@ -44,6 +44,7 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
   const base = `/companies/${c.id}`;
   const tabs = [
     { href: base, label: 'Overview', show: true },
+    { href: `${base}/meetings`, label: 'Meetings', show: can('meeting.read', scope) },
     { href: `${base}/shareholders`, label: 'Shareholders', show: can('shareholder.read', scope) },
     { href: `${base}/imports`, label: 'Register imports', show: can('shareholder.import', scope) },
     { href: `${base}/authorizations`, label: 'Representatives & proxies', show: can('shareholder.read', scope) },

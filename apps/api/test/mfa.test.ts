@@ -73,7 +73,7 @@ describe('staff two-step verification (TOTP)', () => {
     expect(blocked.body.code).toBe('MFA_SETUP_REQUIRED');
     await admin.post('/auth/mfa/setup').expect(200);
     // Roles that are not admin roles are unaffected.
-    const moderator = await login(app, 'moderator@meghnacement.example', PASSWORD).catch(() => null);
+    const moderator = await login(app, 'moderator@marinersventures.example', PASSWORD).catch(() => null);
     if (moderator) await moderator.get('/companies').expect(200);
     process.env.MFA_ENFORCE_FOR_ADMINS = 'false';
     resetEnvCache();
