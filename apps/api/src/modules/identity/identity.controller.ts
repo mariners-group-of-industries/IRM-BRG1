@@ -81,9 +81,14 @@ export class IdentityController {
     @Principal() p: AuthPrincipal,
     @Query('q') q?: string,
     @Query('page') pageRaw?: string,
+    @Query('companyId') companyId?: string,
   ): Promise<Paginated<UserSummary>> {
     if (!p.assignments.some((a) => a.permissions.includes(PERMISSIONS.USER_READ))) {
       throw new ForbiddenException('You do not have permission to view users');
+    }
+    if (companyId) {
+      if (!/^[0-9a-f-]{36}$/i.test(companyId)) throw new BadRequestException('Invalid companyId');
+      await this.access.assertCompany(p, companyId, PERMISSIONS.USER_READ);
     }
     const page = Math.max(1, Number(pageRaw) || 1);
     const pageSize = 25;
@@ -91,6 +96,7 @@ export class IdentityController {
     const where: Prisma.UserWhereInput = {
       AND: [
         this.access.userFilter(p),
+        companyId ? { assignments: { some: { revokedAt: null, companyId } } } : {},
         search
           ? {
               OR: [
@@ -101,7 +107,9 @@ export class IdentityController {
           : {},
       ],
     };
-    const visibleScope = this.visibleAssignmentFilter(p);
+    const visibleScope: Prisma.UserRoleAssignmentWhereInput = companyId
+      ? { companyId }
+      : this.visibleAssignmentFilter(p);
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.user.count({ where }),
       this.prisma.user.findMany({

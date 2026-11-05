@@ -13,7 +13,7 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
   SESSION_TTL_HOURS: z.coerce.number().positive().default(12),
   SESSION_IDLE_MINUTES: z.coerce.number().positive().default(60),
-  WEB_ORIGIN: z.string().url().default('http://localhost:3000'),
+  WEB_ORIGIN: z.string().url().default('http://localhost:3100'),
   COOKIE_SECURE: bool,
   LOGIN_MAX_FAILURES: z.coerce.number().int().positive().default(5),
   LOGIN_LOCK_MINUTES: z.coerce.number().int().positive().default(15),

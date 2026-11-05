@@ -126,3 +126,25 @@ describe('tenant and company isolation', () => {
       .expect(409);
   });
 });
+
+describe('dashboard assignment counts', () => {
+  let app: INestApplication;
+  beforeAll(async () => {
+    app = await bootApp();
+  });
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('platform count equals all active assignments; company admin count stays in scope', async () => {
+    const prisma = app.get(PrismaService);
+    const platform = await login(app, USERS.platform);
+    const all = await prisma.userRoleAssignment.count({ where: { revokedAt: null } });
+    expect((await platform.get('/dashboard/summary').expect(200)).body.counts.roleAssignments).toBe(all);
+
+    const padma = await login(app, USERS.padmaAdmin);
+    const padmaCo = await prisma.company.findFirstOrThrow({ where: { slug: 'padma-pharma' } });
+    const inPadma = await prisma.userRoleAssignment.count({ where: { revokedAt: null, companyId: padmaCo.id } });
+    expect((await padma.get('/dashboard/summary').expect(200)).body.counts.roleAssignments).toBe(inPadma);
+  });
+});

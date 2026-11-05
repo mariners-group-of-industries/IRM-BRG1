@@ -1,0 +1,54 @@
+/*
+ * IRM design tokens. Source of truth for colour, type, radius and elevation.
+ * See DESIGN.md for rationale and usage rules.
+ *
+ * Palette: warm-neutral surfaces, deep navy ink, one accent ("Meghna green",
+ * a deep corporate teal-green). Status colours are reserved for status only.
+ */
+@theme {
+  --font-sans: var(--font-geist), var(--font-bengali), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Surfaces */
+  --color-canvas: #f7f7f5;
+  --color-surface: #ffffff;
+  --color-subtle: #f1f1ee;
+  --color-line: #e4e4df;
+  --color-line-strong: #d3d3cc;
+
+  /* Ink */
+  --color-ink: #0f1b2d;
+  --color-ink-2: #3a4556;
+  --color-ink-3: #667085;
+  --color-ink-4: #98a1ae;
+
+  /* Accent */
+  --color-accent: #0e6b5c;
+  --color-accent-hover: #0a594c;
+  --color-accent-soft: #e6f2ef;
+  --color-accent-ink: #0a4d42;
+
+  /* Status (use only to communicate state) */
+  --color-success: #067647;
+  --color-success-soft: #e8f5ee;
+  --color-warning: #a15c07;
+  --color-warning-soft: #fdf3e2;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+  --color-info: #1d4f91;
+  --color-info-soft: #e9f0fa;
+
+  /* Shape */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Elevation: borders do the work; shadows are reserved for floating layers. */
+  --shadow-xs: 0 1px 2px rgb(15 27 45 / 0.04);
+  --shadow-pop: 0 8px 24px -6px rgb(15 27 45 / 0.14), 0 2px 6px rgb(15 27 45 / 0.06);
+
+  /* Type scale (rem at 16px root) */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+}

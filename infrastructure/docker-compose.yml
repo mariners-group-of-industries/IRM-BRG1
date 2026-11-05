@@ -1,0 +1,41 @@
+# Local services for machines with Docker. Alternative to `pnpm db:start`.
+# Usage: docker compose -f infrastructure/docker-compose.yml up -d
+# Then set DATABASE_URL=postgresql://irm:irm_dev_password@127.0.0.1:5432/irm in apps/api/.env
+name: irm
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: irm
+      POSTGRES_PASSWORD: irm_dev_password
+      POSTGRES_DB: irm
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U irm"]
+      interval: 5s
+      retries: 10
+
+  # Used from Phase D (Socket.IO adapter, BullMQ). Not required for Phase A.
+  redis:
+    image: redis:8-alpine
+    ports: ["127.0.0.1:6379:6379"]
+    profiles: ["full"]
+
+  # S3-compatible private object storage, used from Phase B. Not required for Phase A.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: irm
+      MINIO_ROOT_PASSWORD: irm_dev_password
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: [miniodata:/data]
+    profiles: ["full"]
+
+volumes:
+  pgdata:
+  miniodata:

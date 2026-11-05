@@ -4,6 +4,7 @@ import { PERMISSIONS, type AuditEntry, type DashboardSummary, type Paginated } f
 import { Principal } from '../../common/decorators.js';
 import type { AuthPrincipal } from '../../common/request-context.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { companyInclude, toCompanySummary } from '../tenancy/mappers.js';
 
@@ -53,9 +54,7 @@ export class DashboardController {
       isPlatform ? this.prisma.tenant.count() : Promise.resolve(null),
       this.prisma.company.count({ where: companyWhere }),
       canReadUsers ? this.prisma.user.count({ where: this.access.userFilter(p) }) : Promise.resolve(0),
-      this.prisma.userRoleAssignment.count({
-        where: { revokedAt: null, OR: [{ company: companyWhere }, ...(isPlatform ? [{ companyId: null }] : [])] },
-      }),
+      this.countAssignments(p, companyWhere, isPlatform),
       this.prisma.company.groupBy({ by: ['companyType'], where: companyWhere, _count: { _all: true } }),
       this.prisma.company.findMany({
         where: companyWhere,
@@ -85,6 +84,26 @@ export class DashboardController {
       recentCompanies: recentCompanies.map(toCompanySummary),
       recentAudit: recentAudit.map(toAuditEntry),
     };
+  }
+
+  /**
+   * Active assignments the caller can see: everything for platform operators;
+   * otherwise assignments on visible companies plus group-level assignments of their tenants.
+   */
+  private async countAssignments(
+    p: AuthPrincipal,
+    companyWhere: Prisma.CompanyWhereInput,
+    isPlatform: boolean,
+  ): Promise<number> {
+    if (isPlatform) return this.prisma.userRoleAssignment.count({ where: { revokedAt: null } });
+    const companyIds = (await this.prisma.company.findMany({ where: companyWhere, select: { id: true } })).map((c) => c.id);
+    const tenantIds = p.assignments.filter((a) => a.scope === 'TENANT').map((a) => a.tenantId!);
+    return this.prisma.userRoleAssignment.count({
+      where: {
+        revokedAt: null,
+        OR: [{ companyId: { in: companyIds } }, { scope: 'TENANT', tenantId: { in: tenantIds } }],
+      },
+    });
   }
 
   @Get('audit')
