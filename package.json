@@ -1,0 +1,30 @@
+{
+  "name": "irm-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Investor Relationship Management platform. First module: AGM/EGM Management.",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "db:start": "node infrastructure/dev-db/start.mjs",
+    "db:stop": "node infrastructure/dev-db/stop.mjs",
+    "db:migrate": "pnpm --filter @irm/api db:migrate",
+    "db:seed": "pnpm --filter @irm/api db:seed",
+    "build:shared": "pnpm --filter @irm/shared build",
+    "dev:api": "pnpm --filter @irm/api dev",
+    "dev:web": "pnpm --filter @irm/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write .",
+    "e2e": "pnpm --filter @irm/e2e test"
+  },
+  "devDependencies": {
+    "embedded-postgres": "18.6.0-beta.19",
+    "prettier": "^3.9.10",
+    "typescript": "5.9.3"
+  }
+}
